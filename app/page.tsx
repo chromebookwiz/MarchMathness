@@ -119,7 +119,7 @@ export default function Home() {
       setProgress({
         phase: 'generating', phaseProgress: 1, overall: 0.20,
         message: `SEASON DATA READY — ${samples.length.toLocaleString()} SAMPLES`,
-        detail: 'Feature vectors: 18-dimensional • Label smoothing: ε=0.05',
+        detail: 'Feature vectors: 19-dimensional (incl. sentiment) • Label smoothing: ε=0.05',
       });
       await showPhase(200);
 

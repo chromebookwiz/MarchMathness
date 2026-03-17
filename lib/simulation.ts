@@ -165,79 +165,9 @@ export async function generateTrainingSamples(
   sentiment?: Map<string, number>,
   historicalSamples?: GameSample[],
 ): Promise<GameSample[]> {
-  const samples: GameSample[] = [];
-  const priorW = [
-    2.0, 1.1, 1.1, 0.08, 0.6, 1.0, 1.0, 0.8, 0.5, 0.6,
-    0.25, 0.12, 0.35, 0.3, 0.18, 0.65, 1.0, 0.85,
-    0.5, // sentiment diff
-  ];
-
-  // If we have historical samples (real game outcomes), seed the training corpus with them.
-  if (historicalSamples && historicalSamples.length > 0) {
-    samples.push(...historicalSamples);
-  }
-
-  // Build samples from synthetic season logs
-  function addSample(a: Team, b: Team, label: number) {
-    const features = computeFeatures(a, b, sentiment);
-    samples.push({ features, label });
-  }
-
-  function synOpp(q: 1 | 2 | 3 | 4): Team {
-    const baseOE = [122, 116, 110, 104][q - 1] + (rand() - 0.5) * 6;
-    const baseDE = [93, 101, 107, 114][q - 1] + (rand() - 0.5) * 6;
-    return {
-      id: 'opp', name: 'Opp', seed: 0, region: 'East', espnId: 0,
-      adjOE: baseOE, adjDE: baseDE, adjTempo: 67 + (rand() - 0.5) * 8,
-      wins: 18 + Math.floor(rand() * 8), losses: 5 + Math.floor(rand() * 10),
-      q1W: [6,3,1,0][q-1], q1L: [6,4,2,1][q-1],
-      q2W: 5, q2L: 3, q3W: 6, q3L: 1, q4W: 4, q4L: 0,
-      netRanking: [20,55,115,200][q-1] + (rand() - 0.5) * 25,
-      sos: [25,55,110,185][q-1],
-      last10: 6 + Math.floor(rand() * 4),
-      efgPct: 51 + (rand() - 0.5) * 5,
-      toRate: 16 + (rand() - 0.5) * 4,
-      orbPct: 28 + (rand() - 0.5) * 6,
-      ftRate: 35 + (rand() - 0.5) * 6,
-      defEfgPct: 52, defToRate: 17, defOrbPct: 28, defFtRate: 33,
-      threePtRate: 38, threePtPct: 35,
-      experience: 0.4 + rand() * 0.3,
-      coachTourneyWins: Math.floor(rand() * 20),
-    };
-  }
-
-  teams.forEach(team => {
-    const nr = team.netRanking;
-    const dist: [number, number, number, number] =
-      nr <= 15 ? [14, 8, 6, 4] : nr <= 35 ? [11, 9, 7, 5] : nr <= 65 ? [8, 9, 9, 6] : [4, 7, 11, 10];
-
-    for (let q = 0; q < 4; q++) {
-      const band = (q + 1) as 1 | 2 | 3 | 4;
-      for (let g = 0; g < dist[q]; g++) {
-        const opp = synOpp(band);
-        const prob = 1 / (1 + Math.exp(-(team.netRanking - opp.netRanking) / 20));
-        const label = rand() < prob ? 1 : 0;
-        addSample(team, opp, label);
-      }
-    }
-
-    // Direct H2H matchups vs nearby-ranked teams
-    const peers = teams.filter(t => t.id !== team.id && Math.abs(t.netRanking - team.netRanking) < 22);
-    const numH2H = Math.min(6, peers.length);
-    for (let i = 0; i < numH2H; i++) {
-      const opp = peers[Math.floor(rand() * peers.length)];
-      const prob = 1 / (1 + Math.exp(-(team.netRanking - opp.netRanking) / 20));
-      const label = rand() < prob ? 1 : 0;
-      addSample(team, opp, label);
-    }
-  });
-
-  // Shuffle
-  for (let i = samples.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [samples[i], samples[j]] = [samples[j], samples[i]];
-  }
-  return samples;
+  // Use only real historical game outcomes for training.
+  // Do not generate synthetic/mocked labels.
+  return historicalSamples ?? [];
 }
 
 // ─── Logistic regression (Adam) ────────────────────────────────────────────
