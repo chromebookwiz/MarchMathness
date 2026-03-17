@@ -136,7 +136,7 @@ function GameCard({
   setPos: (p: { x: number; y: number }) => void;
   onClick?: (t: Team) => void;
 }) {
-  const { teamA, teamB } = game;
+  const { teamA, teamB, upsetProb } = game;
   if (!teamA || !teamB) return null;
   return (
     <div
@@ -152,6 +152,7 @@ function GameCard({
         isWinner={game.winner?.id === teamA.id}
         prob={game.winProbA}
         marketProb={game.marketProbA}
+        upsetProb={upsetProb}
         onHover={onHover}
         setPos={setPos}
         onClick={onClick}
@@ -162,6 +163,7 @@ function GameCard({
         isWinner={game.winner?.id === teamB.id}
         prob={1 - game.winProbA}
         marketProb={game.marketProbB}
+        upsetProb={upsetProb}
         onHover={onHover}
         setPos={setPos}
         onClick={onClick}
@@ -171,12 +173,13 @@ function GameCard({
 }
 
 function TeamRow({
-  team, isWinner, prob, marketProb, onHover, setPos, onClick,
+  team, isWinner, prob, marketProb, upsetProb, onHover, setPos, onClick,
 }: {
   team: Team;
   isWinner: boolean;
   prob: number;
   marketProb?: number;
+  upsetProb?: number;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
   onClick?: (t: Team) => void;
@@ -184,6 +187,7 @@ function TeamRow({
   const barColor = winProbColor(prob);
   const pctDisplay = `${Math.round(prob * 100)}%`;
   const marketDisplay = marketProb != null ? `${Math.round(marketProb * 100)}%` : null;
+  const upsetDisplay = upsetProb != null ? `U ${Math.round(upsetProb * 100)}%` : null;
 
   return (
     <div
@@ -240,6 +244,11 @@ function TeamRow({
         {marketDisplay && (
           <span className="text-[7px] text-slate-500 tabular-nums">
             mkt {marketDisplay}
+          </span>
+        )}
+        {upsetDisplay && (
+          <span className="text-[7px] text-slate-500 tabular-nums">
+            {upsetDisplay}
           </span>
         )}
       </div>

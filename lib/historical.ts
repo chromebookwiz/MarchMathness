@@ -137,50 +137,87 @@ export function mapHistoricalStatsToTeams(teams: Team[], stats: TeamSeasonStats[
     if (t.abbreviation) teamsByNorm.set(normalize(t.abbreviation), t);
   });
 
+  // Group stats by season to compute seeds/ranks within each year
+  const statsBySeason = new Map<number, TeamSeasonStats[]>();
   for (const stat of stats) {
-    const norm = normalize(stat.teamName);
-    const match = teamsByNorm.get(norm);
-    if (!match) continue;
+    const arr = statsBySeason.get(stat.season) ?? [];
+    arr.push(stat);
+    statsBySeason.set(stat.season, arr);
+  }
 
-    const pace = stat.pace;
-    const possessions = Math.max(50, Math.min(90, pace));
+  for (const [season, seasonStats] of statsBySeason) {
+    // Compute net rating (adjOE - adjDE) for sorting
+    const seasonRanking = seasonStats
+      .map(s => ({ ...s, netRating: (s.pointsFor - s.pointsAgainst) / Math.max(1, s.games) }))
+      .sort((a, b) => b.netRating - a.netRating);
 
-    const adjOE = stat.pointsFor / stat.games / possessions * 100;
-    const adjDE = stat.pointsAgainst / stat.games / possessions * 100;
+    const avgNetRating = seasonRanking.reduce((s, t) => s + t.netRating, 0) / Math.max(1, seasonRanking.length);
 
-    out.set(`${match.id}-${stat.season}`, {
-      ...match,
-      adjOE,
-      adjDE,
-      adjTempo: pace,
-      wins: stat.wins,
-      losses: stat.losses,
-      netRanking: 100,
-      sos: 50,
-      last10: Math.min(10, stat.wins),
-      efgPct: 0.52,
-      toRate: 16,
-      orbPct: 28,
-      ftRate: 32,
-      defEfgPct: 0.50,
-      defToRate: 16,
-      defOrbPct: 28,
-      defFtRate: 32,
-      threePtRate: 0.35,
-      threePtPct: 0.34,
-      experience: 0.5,
-      coachTourneyWins: 0,
-      roster: match.roster,
-    });
+    for (let idx = 0; idx < seasonRanking.length; idx++) {
+      const stat = seasonRanking[idx];
+      const match = teamsByNorm.get(normalize(stat.teamName));
+      if (!match) continue;
+
+      const pace = stat.pace;
+      const possessions = Math.max(50, Math.min(90, pace));
+
+      const adjOE = stat.pointsFor / Math.max(1, stat.games) / possessions * 100;
+      const adjDE = stat.pointsAgainst / Math.max(1, stat.games) / possessions * 100;
+      const netRating = adjOE - adjDE;
+
+      // Approximate seed based on ranking within the season
+      const seed = Math.min(16, Math.max(1, Math.ceil((idx + 1) / 4)));
+
+      // Approximate SOS as a slight adjustment around 50 based on net rating relative to average
+      const sos = Math.max(1, Math.min(99, 50 + (netRating - avgNetRating) * 0.6));
+
+      // Historic 'last 10' approximated from full-season win rate
+      const last10 = Math.round((stat.wins / Math.max(1, stat.games)) * 10);
+
+      out.set(`${match.id}-${season}`, {
+        ...match,
+        adjOE,
+        adjDE,
+        adjTempo: pace,
+        wins: stat.wins,
+        losses: stat.losses,
+        netRanking: idx + 1,
+        sos,
+        last10,
+        efgPct: 0.52,
+        toRate: 16,
+        orbPct: 28,
+        ftRate: 32,
+        defEfgPct: 0.50,
+        defToRate: 16,
+        defOrbPct: 28,
+        defFtRate: 32,
+        threePtRate: 0.35,
+        threePtPct: 0.34,
+        experience: 0.5,
+        coachTourneyWins: 0,
+        seed,
+        roster: match.roster,
+      });
+    }
   }
 
   return out;
+}
+
+export async function buildHistoricalTeamSnapshots(
+  teams: Team[],
+  seasons: number[],
+): Promise<Map<string, Team>> {
+  const stats = await fetchHistoricalSeasonStats(seasons);
+  return mapHistoricalStatsToTeams(teams, stats);
 }
 
 export function buildHistoricalSamples(
   teams: Team[],
   outcomes: GameOutcome[],
   sentiment?: Map<string, number>,
+  seasonTeams?: Map<string, Team>,
 ): Array<{ features: number[]; label: number }> {
   const normalize = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   const teamMap = new Map<string, Team>();
@@ -196,9 +233,12 @@ export function buildHistoricalSamples(
     const b = teamMap.get(normalize(out.teamB));
     if (!a || !b) continue;
 
+    const seasonA = seasonTeams?.get(`${a.id}-${out.season}`) ?? a;
+    const seasonB = seasonTeams?.get(`${b.id}-${out.season}`) ?? b;
+
     const label = normalize(out.winner) === normalize(out.teamA) ? 1 : 0;
     const features = [
-      ...computeFeatures(a, b, sentiment),
+      ...computeFeatures(seasonA, seasonB, sentiment),
     ];
 
     samples.push({ features, label });

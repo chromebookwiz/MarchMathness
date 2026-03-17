@@ -101,7 +101,9 @@ export interface BracketGame {
   round: number;
   region: string;
   position: number;
-  // Consensus
+  // Monte Carlo consensus / upset metrics
+  upsetProb?: number;       // chance the underdog wins
+  consensusPct?: number;    // fraction of simulations the winner was selected
   teamAConsensus?: number;
   teamBConsensus?: number;
   topTeams?: { team: Team; pct: number }[];

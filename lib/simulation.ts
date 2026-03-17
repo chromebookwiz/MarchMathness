@@ -32,6 +32,9 @@ export const FEATURE_NAMES = [
   'Defensive Score',
   'Raw Scoring Margin',
   'Q1+Q2 Win Rate',
+  'Seed Differential',
+  '3P% Differential',
+  '3P Rate Differential',
   'News Sentiment Diff',
 ];
 
@@ -70,6 +73,9 @@ export function computeFeatures(a: Team, b: Team, sentiment?: Map<string, number
     (defScore(a) - defScore(b)) * 0.03,
     ((aEM - bEM) / 30),
     q12r(a) - q12r(b),
+    (a.seed - b.seed) * 0.03,
+    (a.threePtPct - b.threePtPct) * 0.5,
+    (a.threePtRate - b.threePtRate) * 0.5,
     (aSent - bSent) * 0.5,
   ];
 }
@@ -288,17 +294,41 @@ export interface BracketSimOutput {
   champion: Team;
   allRoundWinners: Map<string, Team>;
   winProbs: Map<string, number>;
+  matchups?: Map<string, { a: Team; b: Team; probA: number }>;
+}
+
+export interface MonteCarloGameStats {
+  winners: Map<string, { team: Team; count: number }>;
+  total: number;
+  underdogWins: number;
+}
+
+export interface MonteCarloResult {
+  bracket: DisplayBracket;
+  stats: Map<string, MonteCarloGameStats>;
+  championCounts: Map<string, number>;
 }
 
 export function simulateBracket(
   regionTeams: Team[][],
   model: EnsembleModel,
   abortSignal?: { aborted: boolean },
+  options?: { randomize?: boolean; randomSeed?: number; temperature?: number },
 ): BracketSimOutput {
+  const { randomize = false, randomSeed, temperature = 0.92 } = options ?? {};
+  if (randomize && randomSeed !== undefined) setSeed(randomSeed);
+
   const regionRounds: Team[][][] = [[], [], [], []];
   const finalFour: Team[] = [];
   const allRoundWinners = new Map<string, Team>();
   const winProbs = new Map<string, number>();
+
+  const pickWinner = (a: Team, b: Team, prob: number): Team => {
+    if (!randomize) return prob >= 0.5 ? a : b;
+    // Smooth probabilities slightly so underdogs have a chance
+    const adjusted = 0.5 + (prob - 0.5) * temperature;
+    return rand() < adjusted ? a : b;
+  };
 
   for (let r = 0; r < 4; r++) {
     let pool = [...regionTeams[r]];
@@ -310,7 +340,7 @@ export function simulateBracket(
         if (abortSignal?.aborted) return { regionRounds, finalFour: [], ffWinners: [], champion: pool[0], allRoundWinners, winProbs };
         const a = pool[i], b = pool[i + 1];
         const prob = ensembleWinProb(model, a, b);
-        const winner = prob >= 0.5 ? a : b;
+        const winner = pickWinner(a, b, prob);
         const key = `r${r}_rd${round}_g${i / 2}`;
         allRoundWinners.set(key, winner);
         winProbs.set(key, winner === a ? prob : 1 - prob);
@@ -325,11 +355,11 @@ export function simulateBracket(
   // Final Four: East vs South, Midwest vs West
   const ff0Prob = ensembleWinProb(model, finalFour[0], finalFour[1]);
   const ff1Prob = ensembleWinProb(model, finalFour[2], finalFour[3]);
-  const ff0 = ff0Prob >= 0.5 ? finalFour[0] : finalFour[1];
-  const ff1 = ff1Prob >= 0.5 ? finalFour[2] : finalFour[3];
+  const ff0 = pickWinner(finalFour[0], finalFour[1], ff0Prob);
+  const ff1 = pickWinner(finalFour[2], finalFour[3], ff1Prob);
 
   const champProb = ensembleWinProb(model, ff0, ff1);
-  const champ = champProb >= 0.5 ? ff0 : ff1;
+  const champ = pickWinner(ff0, ff1, champProb);
 
   return {
     regionRounds,
@@ -339,6 +369,204 @@ export function simulateBracket(
     allRoundWinners,
     winProbs,
   };
+}
+
+export interface MonteCarloOptions {
+  runs?: number;
+  temperature?: number;
+  seed?: number;
+}
+
+export type MonteCarloProgress = (run: number, total: number) => void;
+
+export async function runMonteCarloBracket(
+  regionTeams: Team[][],
+  model: EnsembleModel,
+  options: MonteCarloOptions = {},
+  onProgress?: MonteCarloProgress,
+  abortSignal?: { aborted: boolean },
+): Promise<MonteCarloResult> {
+  const runs = Math.max(1, options.runs ?? 500);
+  const temp = options.temperature ?? 0.9;
+  const seed = options.seed ?? Date.now();
+
+  const stats = new Map<string, MonteCarloGameStats>();
+  const champCounts = new Map<string, number>();
+
+  const addWinner = (key: string, team: Team, isUnderdog: boolean) => {
+    let s = stats.get(key);
+    if (!s) {
+      s = { winners: new Map(), total: 0, underdogWins: 0 };
+      stats.set(key, s);
+    }
+    const prev = s.winners.get(team.id);
+    if (prev) prev.count += 1;
+    else s.winners.set(team.id, { team, count: 1 });
+    s.total += 1;
+    if (isUnderdog) s.underdogWins += 1;
+  };
+
+  const addChampion = (team: Team) => {
+    const prev = champCounts.get(team.id) ?? 0;
+    champCounts.set(team.id, prev + 1);
+  };
+
+  for (let i = 0; i < runs; i++) {
+    if (abortSignal?.aborted) break;
+    const runSeed = seed + i * 31;
+    const sim = simulateBracket(regionTeams, model, abortSignal, {
+      randomize: true,
+      randomSeed: runSeed,
+      temperature: temp,
+    });
+
+    addChampion(sim.champion);
+
+    for (const [key, winner] of sim.allRoundWinners) {
+      const winProb = sim.winProbs.get(key) ?? 0.5;
+      const isUnderdog = winProb < 0.5;
+      addWinner(key, winner, isUnderdog);
+    }
+
+    onProgress?.(i + 1, runs);
+    // Yield to event loop to keep UI responsive.
+    if (i % 50 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  const bracket = buildConsensusBracket(regionTeams, model, stats);
+
+  return { bracket, stats, championCounts: champCounts };
+}
+
+function buildConsensusBracket(
+  regionTeams: Team[][],
+  model: EnsembleModel,
+  stats: Map<string, MonteCarloGameStats>,
+): DisplayBracket {
+  const makeDisplay = (regionName: string, regionIdx: number): DisplayGame[][] => {
+    const rounds: DisplayGame[][] = [];
+    // Round 1 uses fixed bracket teams
+    let base = [...regionTeams[regionIdx]];
+
+    for (let rd = 0; rd < 4; rd++) {
+      const games: DisplayGame[] = [];
+      for (let i = 0; i < base.length; i += 2) {
+        const key = `r${regionIdx}_rd${rd}_g${i / 2}`;
+        const stat = stats.get(key);
+
+        const topTeams = stat
+          ? Array.from(stat.winners.values())
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 2)
+          : [];
+
+        const teamA = topTeams[0]?.team ?? base[i];
+        const teamB = topTeams[1]?.team ?? base[i + 1];
+        const winner = topTeams[0]?.team ?? base[i];
+
+        const total = stat?.total ?? 1;
+        const winA = stat?.winners.get(teamA.id)?.count ?? (teamA.id === winner.id ? total : 0);
+        const winB = stat?.winners.get(teamB.id)?.count ?? (teamB.id === winner.id ? total : 0);
+
+        const upsetProb = stat ? (stat.underdogWins / stat.total) : 0;
+        const consensusPct = winA / total;
+
+        const prob = consensusPct; // use consensus win probability for display
+
+        games.push({
+          id: key,
+          teamA,
+          teamB,
+          winner,
+          winProbA: prob,
+          marketProbA: undefined,
+          marketProbB: undefined,
+          round: rd + 1,
+          region: regionName,
+          position: i / 2,
+          upsetProb,
+          consensusPct,
+          teamAConsensus: winA / total,
+          teamBConsensus: winB / total,
+          topTeams: topTeams.map(t => ({ team: t.team, pct: t.count / total })),
+        });
+      }
+      rounds.push(games);
+
+      // Build next base line based on consensus winners
+      base = games.map(g => g.winner ?? null).filter(Boolean) as Team[];
+      if (base.length === 0) break;
+    }
+
+    return rounds;
+  };
+
+  const east = makeDisplay('East', 0);
+  const south = makeDisplay('South', 1);
+  const midwest = makeDisplay('Midwest', 2);
+  const west = makeDisplay('West', 3);
+
+  // Final Four
+  const ff0a = east[3][0].winner!;
+  const ff0b = south[3][0].winner!;
+  const ff1a = midwest[3][0].winner!;
+  const ff1b = west[3][0].winner!;
+
+  const ff0Prob = ensembleWinProb(model, ff0a, ff0b);
+  const ff1Prob = ensembleWinProb(model, ff1a, ff1b);
+  const ff0Winner = ff0Prob >= 0.5 ? ff0a : ff0b;
+  const ff1Winner = ff1Prob >= 0.5 ? ff1a : ff1b;
+
+  const champProb = ensembleWinProb(model, ff0Winner, ff1Winner);
+  const champWinner = champProb >= 0.5 ? ff0Winner : ff1Winner;
+
+  const finalFour: DisplayGame[] = [
+    {
+      id: 'ff_0',
+      teamA: ff0a,
+      teamB: ff0b,
+      winner: ff0Winner,
+      winProbA: ff0Prob,
+      marketProbA: marketWinProb(ff0a, ff0b),
+      marketProbB: 1 - marketWinProb(ff0a, ff0b),
+      round: 5,
+      region: 'Final Four',
+      position: 0,
+      upsetProb: 1 - Math.max(ff0Prob, 1 - ff0Prob),
+      consensusPct: Math.max(ff0Prob, 1 - ff0Prob),
+    },
+    {
+      id: 'ff_1',
+      teamA: ff1a,
+      teamB: ff1b,
+      winner: ff1Winner,
+      winProbA: ff1Prob,
+      marketProbA: marketWinProb(ff1a, ff1b),
+      marketProbB: 1 - marketWinProb(ff1a, ff1b),
+      round: 5,
+      region: 'Final Four',
+      position: 1,
+      upsetProb: 1 - Math.max(ff1Prob, 1 - ff1Prob),
+      consensusPct: Math.max(ff1Prob, 1 - ff1Prob),
+    },
+  ];
+
+  const championship: DisplayGame = {
+    id: 'champ',
+    teamA: ff0Winner,
+    teamB: ff1Winner,
+    winner: champWinner,
+    winProbA: champProb,
+    marketProbA: marketWinProb(ff0Winner, ff1Winner),
+    marketProbB: 1 - marketWinProb(ff0Winner, ff1Winner),
+    round: 6,
+    region: 'Championship',
+    position: 0,
+    upsetProb: 1 - Math.max(champProb, 1 - champProb),
+    consensusPct: Math.max(champProb, 1 - champProb),
+  };
+
+  return { east, south, midwest, west, finalFour, championship };
 }
 
 
@@ -355,8 +583,12 @@ export interface DisplayGame {
   round: number;
   region: string;
   position: number;
+  // Monte Carlo consensus / upset metrics
+  upsetProb?: number;
+  consensusPct?: number;
   teamAConsensus?: number;
   teamBConsensus?: number;
+  topTeams?: { team: Team; pct: number }[];
 }
 
 export interface DisplayBracket {

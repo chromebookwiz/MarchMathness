@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { SimProgress, ModelStats, Team } from '@/lib/types';
 import type { DisplayBracket, EnsembleModel, GameSample, TrainingData } from '@/lib/simulation';
-import { lrPredict } from '@/lib/simulation';
+import { lrPredict, setSeed, runMonteCarloBracket } from '@/lib/simulation';
 import { nnPredictDeep } from '@/lib/neuralNet';
 import ProgressBar from '@/components/ProgressBar';
 
@@ -21,6 +21,7 @@ async function showPhase(ms: number) {
 
 export default function Home() {
   const [nnEpochs, setNnEpochs]       = useState(DEFAULT_EPOCHS);
+  const [mcRuns, setMcRuns]           = useState(500);
   const [running, setRunning]         = useState(false);
   const [showInfo, setShowInfo]       = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -53,7 +54,7 @@ export default function Home() {
       const { fetchAllRosters } = await import('@/lib/espn');
       const { fetchMarketOdds } = await import('@/lib/odds');
       const { fetchSentimentScores } = await import('@/lib/sentiment');
-      const { fetchHistoricalOutcomes, buildHistoricalSamples } = await import('@/lib/historical');
+      const { fetchHistoricalOutcomes, buildHistoricalSamples, buildHistoricalTeamSnapshots } = await import('@/lib/historical');
 
       const regionTeams = buildRegionTeams();
       const allTeams    = regionTeams.flat();
@@ -105,8 +106,10 @@ export default function Home() {
       const sentiment = await fetchSentimentScores(allTeams);
 
       // Historical training data (2020–2025)
-      const historicalOutcomes = await fetchHistoricalOutcomes([2020, 2021, 2022, 2023, 2024, 2025]);
-      const historicalSamples = buildHistoricalSamples(allTeams, historicalOutcomes, sentiment);
+      const historicalSeasons = [2020, 2021, 2022, 2023, 2024, 2025];
+      const historicalOutcomes = await fetchHistoricalOutcomes(historicalSeasons);
+      const seasonTeams = await buildHistoricalTeamSnapshots(allTeams, historicalSeasons);
+      const historicalSamples = buildHistoricalSamples(allTeams, historicalOutcomes, sentiment, seasonTeams);
 
       const { train: trainSamples, val: valSamples } = await generateTrainingSamples(historicalSamples);
       const samplesNN = [...trainSamples];
@@ -230,42 +233,47 @@ export default function Home() {
 
         setProgress({
           phase: 'simulating', phaseProgress: 0, overall: 0.66,
-          message: 'SIMULATING TOURNAMENT BRACKET',
-          detail: 'Evaluating 63 games deterministically from ensemble probability distribution',
-        });
-        await showPhase(300);
-
-        const simResult = simulateBracket(regionTeams, model, abortRef.current);
-
-        setProgress({
-          phase: 'simulating', phaseProgress: 0.6, overall: 0.80,
-          message: 'RUNNING PLAYER-LEVEL POSSESSION SIMULATION',
-          detail: 'BPM · TS% · depth score · usage-weighted shot selection',
-        });
-        await showPhase(300);
-
-        setProgress({
-          phase: 'simulating', phaseProgress: 1, overall: 0.90,
-          message: 'BRACKET SIMULATION COMPLETE',
-          detail: `63 games resolved · Champion: ${simResult.champion.name}`,
-        });
-        await showPhase(150);
-
-        setProgress({
-          phase: 'analyzing', phaseProgress: 0, overall: 0.92,
-          message: 'BUILDING DISPLAY BRACKET',
-          detail: 'Mapping game results to visualization layout',
+          message: 'MONTE CARLO CONSENSUS SIMULATION',
+          detail: `Running ${mcRuns.toLocaleString()} bracket simulations…`,
         });
         await showPhase(200);
 
-        const display = buildDisplayBracket(regionTeams, model, simResult);
-        setBracket(display);
-        setChampion(simResult.champion);
+        const mcResult = await runMonteCarloBracket(
+          regionTeams,
+          model,
+          { runs: mcRuns, temperature: 0.88 },
+          (run, total) => {
+            setProgress({
+              phase: 'simulating',
+              phaseProgress: run / total,
+              overall: 0.66 + (run / total) * 0.18,
+              message: 'MONTE CARLO CONSENSUS SIMULATION',
+              detail: `Run ${run.toLocaleString()} / ${total.toLocaleString()} — building consensus...`,
+            });
+          },
+          abortRef.current,
+        );
+
+        const allTeamsMap = new Map<string, Team>(allTeams.map(t => [t.id, t]));
+        const championEntry = Array.from(mcResult.championCounts.entries())
+          .sort((a, b) => b[1] - a[1])[0];
+        const championTeam = championEntry ? allTeamsMap.get(championEntry[0]) ?? mcResult.bracket.championship.winner : null;
+        const championPct = championEntry ? (championEntry[1] / mcRuns) : 0;
+
+        setProgress({
+          phase: 'analyzing', phaseProgress: 0, overall: 0.84,
+          message: 'BUILDING DISPLAY BRACKET',
+          detail: `Consensus bracket built — top champion: ${championTeam?.name ?? 'TBD'} (${(championPct * 100).toFixed(1)}%)`,
+        });
+        await showPhase(200);
+
+        setBracket(mcResult.bracket);
+        if (championTeam) setChampion(championTeam);
 
         setProgress({
           phase: 'done', phaseProgress: 1, overall: 1,
           message: 'BRACKET GENERATED',
-          detail: `Predicted champion: ${simResult.champion.name} (#${simResult.champion.seed} seed, ${simResult.champion.region})`,
+          detail: `Champion consensus: ${championTeam?.name ?? 'TBD'} (${(championPct * 100).toFixed(1)}%)`,
         });
 
     } catch (err) {
@@ -346,6 +354,39 @@ export default function Home() {
               disabled={running}
               style={{
                 width: '74px',
+                background: 'transparent',
+                border: '1px solid #1e3a5f',
+                color: '#f59e0b',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                fontWeight: 900,
+                padding: '4px 8px',
+                textAlign: 'center',
+              }}
+            />
+          </div>
+
+          {/* Monte Carlo Runs Input */}
+          <div
+            className="flex items-center px-3 py-1.5"
+            style={{ border: '1px solid #1e3a5f', background: '#030b18' }}
+          >
+            <span className="text-[10px] tracking-[0.1em] text-slate-400 uppercase mr-3">MC Runs</span>
+            <input
+              type="number"
+              min={10}
+              max={2000}
+              step={10}
+              value={mcRuns}
+              onChange={e => {
+                let v = parseInt(e.target.value, 10);
+                if (isNaN(v)) v = 500;
+                v = Math.max(10, Math.min(2000, v));
+                setMcRuns(v);
+              }}
+              disabled={running}
+              style={{
+                width: '64px',
                 background: 'transparent',
                 border: '1px solid #1e3a5f',
                 color: '#f59e0b',
