@@ -104,12 +104,18 @@ export interface EnsembleModel {
   lrWeights: ModelWeights;
   nnWeights: DeepNNWeights;
   elos: Map<string, number>;
+  marketOdds?: Map<string, number>;
   ensembleW: { lr: number; nn: number; elo: number; em: number; market: number };
 }
 
-function marketWinProb(a: Team, b: Team): number {
-  // Proxy for betting market implied probabilities based on seed gap
-  // (stronger seeds are favored in real books).
+function marketWinProb(a: Team, b: Team, marketOdds?: Map<string, number>): number {
+  if (marketOdds) {
+    const key = `${a.id}__vs__${b.id}`;
+    const p = marketOdds.get(key);
+    if (p != null) return p;
+  }
+
+  // Fallback proxy: betting markets typically favor lower seeds.
   const seedDiff = b.seed - a.seed;
   return 1 / (1 + Math.exp(-seedDiff / 4));
 }
@@ -132,7 +138,7 @@ export function ensembleWinProb(
   const bEM = b.adjOE - b.adjDE;
   const emP = sigmoid((aEM - bEM) * 0.20);
 
-  const marketP = marketWinProb(a, b);
+  const marketP = marketWinProb(a, b, model.marketOdds);
 
   // Base ensemble (weighted average)
   const totalW = lr + nn + elo + em + market;
