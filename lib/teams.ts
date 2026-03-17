@@ -8,6 +8,7 @@ export const TEAMS: Team[] = [
   // ═══════════════════════════════════════════════════════════════
   {
     id: 'duke', name: 'Duke', seed: 1, region: 'East',
+    espnId: 150,
     adjOE: 123.4, adjDE: 93.2, adjTempo: 68.8,
     wins: 35, losses: 4, q1W: 11, q1L: 4, q2W: 9, q2L: 0, q3W: 9, q3L: 0, q4W: 6, q4L: 0,
     netRanking: 1, sos: 18, last10: 9,
@@ -17,6 +18,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'alabama', name: 'Alabama', seed: 2, region: 'East',
+    espnId: 333,
     adjOE: 120.8, adjDE: 96.4, adjTempo: 71.2,
     wins: 28, losses: 7, q1W: 9, q1L: 7, q2W: 8, q2L: 0, q3W: 8, q3L: 0, q4W: 3, q4L: 0,
     netRanking: 6, sos: 22, last10: 8,
@@ -26,6 +28,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'wisconsin', name: 'Wisconsin', seed: 3, region: 'East',
+    espnId: 275,
     adjOE: 118.2, adjDE: 96.8, adjTempo: 64.6,
     wins: 27, losses: 8, q1W: 8, q1L: 7, q2W: 8, q2L: 1, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 11, sos: 28, last10: 8,
@@ -35,6 +38,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'arizona', name: 'Arizona', seed: 4, region: 'East',
+    espnId: 12,
     adjOE: 116.4, adjDE: 98.1, adjTempo: 70.1,
     wins: 26, losses: 9, q1W: 8, q1L: 8, q2W: 7, q2L: 1, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 16, sos: 32, last10: 7,
@@ -44,6 +48,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'oregon', name: 'Oregon', seed: 5, region: 'East',
+    espnId: 2483,
     adjOE: 115.9, adjDE: 100.2, adjTempo: 69.8,
     wins: 24, losses: 11, q1W: 7, q1L: 9, q2W: 7, q2L: 2, q3W: 6, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 22, sos: 34, last10: 7,
@@ -53,6 +58,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'byu', name: 'BYU', seed: 6, region: 'East',
+    espnId: 252,
     adjOE: 116.2, adjDE: 102.4, adjTempo: 67.4,
     wins: 23, losses: 11, q1W: 6, q1L: 9, q2W: 7, q2L: 2, q3W: 6, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 28, sos: 38, last10: 6,
@@ -62,6 +68,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'saint-marys', name: "Saint Mary's", seed: 7, region: 'East',
+    espnId: 2608,
     adjOE: 114.8, adjDE: 102.1, adjTempo: 63.2,
     wins: 28, losses: 7, q1W: 5, q1L: 5, q2W: 6, q2L: 2, q3W: 9, q3L: 0, q4W: 8, q4L: 0,
     netRanking: 30, sos: 52, last10: 8,
@@ -71,6 +78,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'miss-state', name: 'Mississippi State', seed: 8, region: 'East',
+    espnId: 344,
     adjOE: 113.8, adjDE: 104.2, adjTempo: 69.4,
     wins: 22, losses: 13, q1W: 5, q1L: 11, q2W: 6, q2L: 2, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 38, sos: 42, last10: 6,
@@ -80,6 +88,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'baylor', name: 'Baylor', seed: 9, region: 'East',
+    espnId: 239,
     adjOE: 113.2, adjDE: 105.1, adjTempo: 70.2,
     wins: 21, losses: 13, q1W: 5, q1L: 11, q2W: 6, q2L: 2, q3W: 6, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 42, sos: 44, last10: 6,
@@ -89,6 +98,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'vanderbilt', name: 'Vanderbilt', seed: 10, region: 'East',
+    espnId: 238,
     adjOE: 114.2, adjDE: 107.4, adjTempo: 70.8,
     wins: 22, losses: 13, q1W: 4, q1L: 10, q2W: 7, q2L: 3, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 45, sos: 40, last10: 7,
@@ -98,6 +108,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'vcu', name: 'VCU', seed: 11, region: 'East',
+    espnId: 2670,
     adjOE: 111.4, adjDE: 106.8, adjTempo: 68.4,
     wins: 25, losses: 10, q1W: 4, q1L: 8, q2W: 6, q2L: 2, q3W: 9, q3L: 0, q4W: 6, q4L: 0,
     netRanking: 48, sos: 56, last10: 7,
@@ -107,6 +118,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'liberty', name: 'Liberty', seed: 12, region: 'East',
+    espnId: 2335,
     adjOE: 112.4, adjDE: 109.2, adjTempo: 67.8,
     wins: 29, losses: 6, q1W: 2, q1L: 4, q2W: 4, q2L: 2, q3W: 10, q3L: 0, q4W: 13, q4L: 0,
     netRanking: 54, sos: 72, last10: 8,
@@ -116,6 +128,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'akron', name: 'Akron', seed: 13, region: 'East',
+    espnId: 2006,
     adjOE: 110.2, adjDE: 111.4, adjTempo: 66.4,
     wins: 26, losses: 9, q1W: 1, q1L: 3, q2W: 3, q2L: 4, q3W: 10, q3L: 2, q4W: 12, q4L: 0,
     netRanking: 68, sos: 88, last10: 8,
@@ -125,6 +138,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'montana', name: 'Montana', seed: 14, region: 'East',
+    espnId: 149,
     adjOE: 108.4, adjDE: 113.8, adjTempo: 65.2,
     wins: 24, losses: 9, q1W: 0, q1L: 3, q2W: 2, q2L: 5, q3W: 9, q3L: 1, q4W: 13, q4L: 0,
     netRanking: 88, sos: 110, last10: 7,
@@ -134,6 +148,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'robert-morris', name: 'Robert Morris', seed: 15, region: 'East',
+    espnId: 2523,
     adjOE: 106.1, adjDE: 115.8, adjTempo: 66.8,
     wins: 22, losses: 12, q1W: 0, q1L: 2, q2W: 1, q2L: 4, q3W: 8, q3L: 2, q4W: 13, q4L: 4,
     netRanking: 112, sos: 135, last10: 7,
@@ -143,6 +158,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'longwood', name: 'Longwood', seed: 16, region: 'East',
+    espnId: 2393,
     adjOE: 103.8, adjDE: 118.4, adjTempo: 67.6,
     wins: 20, losses: 15, q1W: 0, q1L: 1, q2W: 0, q2L: 4, q3W: 7, q3L: 4, q4W: 13, q4L: 6,
     netRanking: 142, sos: 162, last10: 6,
@@ -156,6 +172,7 @@ export const TEAMS: Team[] = [
   // ═══════════════════════════════════════════════════════════════
   {
     id: 'auburn', name: 'Auburn', seed: 1, region: 'South',
+    espnId: 2,
     adjOE: 122.1, adjDE: 93.8, adjTempo: 71.8,
     wins: 30, losses: 5, q1W: 12, q1L: 5, q2W: 9, q2L: 0, q3W: 7, q3L: 0, q4W: 2, q4L: 0,
     netRanking: 2, sos: 12, last10: 9,
@@ -165,6 +182,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'michigan-state', name: 'Michigan State', seed: 2, region: 'South',
+    espnId: 127,
     adjOE: 118.4, adjDE: 95.8, adjTempo: 68.2,
     wins: 27, losses: 8, q1W: 9, q1L: 8, q2W: 8, q2L: 0, q3W: 7, q3L: 0, q4W: 3, q4L: 0,
     netRanking: 7, sos: 24, last10: 8,
@@ -174,6 +192,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'iowa-state', name: 'Iowa State', seed: 3, region: 'South',
+    espnId: 66,
     adjOE: 118.8, adjDE: 97.4, adjTempo: 67.1,
     wins: 26, losses: 8, q1W: 9, q1L: 8, q2W: 7, q2L: 1, q3W: 7, q3L: 0, q4W: 3, q4L: 0,
     netRanking: 9, sos: 26, last10: 8,
@@ -183,6 +202,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'texas-am', name: 'Texas A&M', seed: 4, region: 'South',
+    espnId: 245,
     adjOE: 115.4, adjDE: 97.8, adjTempo: 69.4,
     wins: 25, losses: 10, q1W: 7, q1L: 9, q2W: 7, q2L: 1, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 17, sos: 30, last10: 7,
@@ -192,6 +212,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'michigan', name: 'Michigan', seed: 5, region: 'South',
+    espnId: 130,
     adjOE: 114.2, adjDE: 99.6, adjTempo: 68.6,
     wins: 23, losses: 11, q1W: 6, q1L: 9, q2W: 7, q2L: 2, q3W: 6, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 23, sos: 35, last10: 7,
@@ -201,6 +222,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'mississippi', name: 'Mississippi', seed: 6, region: 'South',
+    espnId: 145,
     adjOE: 114.6, adjDE: 101.2, adjTempo: 70.6,
     wins: 22, losses: 12, q1W: 5, q1L: 10, q2W: 6, q2L: 2, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 29, sos: 38, last10: 7,
@@ -210,6 +232,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'gonzaga', name: 'Gonzaga', seed: 7, region: 'South',
+    espnId: 2250,
     adjOE: 117.2, adjDE: 104.8, adjTempo: 72.4,
     wins: 26, losses: 9, q1W: 5, q1L: 7, q2W: 6, q2L: 2, q3W: 8, q3L: 0, q4W: 7, q4L: 0,
     netRanking: 31, sos: 55, last10: 8,
@@ -219,6 +242,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'louisville', name: 'Louisville', seed: 8, region: 'South',
+    espnId: 97,
     adjOE: 112.8, adjDE: 103.8, adjTempo: 70.4,
     wins: 22, losses: 13, q1W: 4, q1L: 11, q2W: 6, q2L: 2, q3W: 8, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 39, sos: 43, last10: 6,
@@ -228,6 +252,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'creighton', name: 'Creighton', seed: 9, region: 'South',
+    espnId: 156,
     adjOE: 112.4, adjDE: 106.2, adjTempo: 66.8,
     wins: 21, losses: 14, q1W: 4, q1L: 11, q2W: 5, q2L: 3, q3W: 8, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 43, sos: 46, last10: 6,
@@ -237,6 +262,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'new-mexico', name: 'New Mexico', seed: 10, region: 'South',
+    espnId: 167,
     adjOE: 112.2, adjDE: 107.8, adjTempo: 70.2,
     wins: 23, losses: 12, q1W: 3, q1L: 9, q2W: 6, q2L: 3, q3W: 9, q3L: 0, q4W: 5, q4L: 0,
     netRanking: 46, sos: 58, last10: 7,
@@ -246,6 +272,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'drake', name: 'Drake', seed: 11, region: 'South',
+    espnId: 2181,
     adjOE: 112.8, adjDE: 108.8, adjTempo: 65.4,
     wins: 28, losses: 6, q1W: 2, q1L: 4, q2W: 4, q2L: 2, q3W: 11, q3L: 0, q4W: 11, q4L: 0,
     netRanking: 50, sos: 74, last10: 9,
@@ -255,6 +282,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'uc-san-diego', name: 'UC San Diego', seed: 12, region: 'South',
+    espnId: 2706,
     adjOE: 110.8, adjDE: 108.4, adjTempo: 66.8,
     wins: 28, losses: 7, q1W: 1, q1L: 3, q2W: 3, q2L: 2, q3W: 12, q3L: 0, q4W: 12, q4L: 2,
     netRanking: 55, sos: 78, last10: 8,
@@ -264,6 +292,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'yale', name: 'Yale', seed: 13, region: 'South',
+    espnId: 43,
     adjOE: 111.4, adjDE: 112.2, adjTempo: 64.8,
     wins: 24, losses: 7, q1W: 0, q1L: 3, q2W: 2, q2L: 4, q3W: 10, q3L: 0, q4W: 12, q4L: 0,
     netRanking: 70, sos: 91, last10: 8,
@@ -273,6 +302,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'lipscomb', name: 'Lipscomb', seed: 14, region: 'South',
+    espnId: 2348,
     adjOE: 109.2, adjDE: 114.1, adjTempo: 67.4,
     wins: 25, losses: 9, q1W: 0, q1L: 2, q2W: 2, q2L: 4, q3W: 9, q3L: 3, q4W: 14, q4L: 0,
     netRanking: 90, sos: 112, last10: 7,
@@ -282,6 +312,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'bryant', name: 'Bryant', seed: 15, region: 'South',
+    espnId: 2803,
     adjOE: 106.4, adjDE: 116.2, adjTempo: 68.2,
     wins: 23, losses: 11, q1W: 0, q1L: 1, q2W: 1, q2L: 3, q3W: 8, q3L: 3, q4W: 14, q4L: 4,
     netRanking: 116, sos: 138, last10: 7,
@@ -291,6 +322,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'winthrop', name: 'Winthrop', seed: 16, region: 'South',
+    espnId: 2679,
     adjOE: 104.4, adjDE: 117.8, adjTempo: 68.8,
     wins: 21, losses: 14, q1W: 0, q1L: 1, q2W: 0, q2L: 3, q3W: 7, q3L: 5, q4W: 14, q4L: 5,
     netRanking: 145, sos: 165, last10: 6,
@@ -304,6 +336,7 @@ export const TEAMS: Team[] = [
   // ═══════════════════════════════════════════════════════════════
   {
     id: 'tennessee', name: 'Tennessee', seed: 1, region: 'Midwest',
+    espnId: 2633,
     adjOE: 119.4, adjDE: 92.4, adjTempo: 66.8,
     wins: 30, losses: 5, q1W: 11, q1L: 5, q2W: 9, q2L: 0, q3W: 8, q3L: 0, q4W: 2, q4L: 0,
     netRanking: 3, sos: 14, last10: 9,
@@ -313,6 +346,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'st-johns', name: "St. John's", seed: 2, region: 'Midwest',
+    espnId: 2599,
     adjOE: 117.2, adjDE: 94.8, adjTempo: 68.8,
     wins: 28, losses: 6, q1W: 10, q1L: 6, q2W: 8, q2L: 0, q3W: 7, q3L: 0, q4W: 3, q4L: 0,
     netRanking: 8, sos: 20, last10: 8,
@@ -322,6 +356,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'kentucky', name: 'Kentucky', seed: 3, region: 'Midwest',
+    espnId: 96,
     adjOE: 116.8, adjDE: 96.2, adjTempo: 69.8,
     wins: 25, losses: 10, q1W: 8, q1L: 9, q2W: 7, q2L: 1, q3W: 7, q3L: 0, q4W: 3, q4L: 0,
     netRanking: 12, sos: 27, last10: 7,
@@ -331,6 +366,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'maryland', name: 'Maryland', seed: 4, region: 'Midwest',
+    espnId: 120,
     adjOE: 115.2, adjDE: 98.4, adjTempo: 70.4,
     wins: 26, losses: 9, q1W: 7, q1L: 8, q2W: 8, q2L: 1, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 18, sos: 33, last10: 8,
@@ -340,6 +376,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'texas', name: 'Texas', seed: 5, region: 'Midwest',
+    espnId: 251,
     adjOE: 114.8, adjDE: 99.2, adjTempo: 68.4,
     wins: 24, losses: 11, q1W: 7, q1L: 10, q2W: 6, q2L: 1, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 24, sos: 36, last10: 7,
@@ -349,6 +386,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'kansas', name: 'Kansas', seed: 6, region: 'Midwest',
+    espnId: 2305,
     adjOE: 115.4, adjDE: 102.2, adjTempo: 69.8,
     wins: 22, losses: 12, q1W: 5, q1L: 10, q2W: 7, q2L: 2, q3W: 6, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 32, sos: 40, last10: 6,
@@ -358,6 +396,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'ucla', name: 'UCLA', seed: 7, region: 'Midwest',
+    espnId: 26,
     adjOE: 114.2, adjDE: 103.4, adjTempo: 68.1,
     wins: 22, losses: 13, q1W: 5, q1L: 10, q2W: 6, q2L: 3, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 34, sos: 44, last10: 7,
@@ -367,6 +406,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'purdue', name: 'Purdue', seed: 8, region: 'Midwest',
+    espnId: 2509,
     adjOE: 114.4, adjDE: 105.8, adjTempo: 67.4,
     wins: 22, losses: 13, q1W: 4, q1L: 11, q2W: 7, q2L: 2, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 40, sos: 45, last10: 6,
@@ -376,6 +416,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'illinois', name: 'Illinois', seed: 9, region: 'Midwest',
+    espnId: 356,
     adjOE: 113.8, adjDE: 106.8, adjTempo: 70.8,
     wins: 21, losses: 13, q1W: 4, q1L: 11, q2W: 6, q2L: 3, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 44, sos: 47, last10: 6,
@@ -385,6 +426,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'utah-state', name: 'Utah State', seed: 10, region: 'Midwest',
+    espnId: 254,
     adjOE: 114.4, adjDE: 108.8, adjTempo: 68.2,
     wins: 25, losses: 8, q1W: 3, q1L: 7, q2W: 6, q2L: 2, q3W: 9, q3L: 0, q4W: 7, q4L: 1,
     netRanking: 47, sos: 62, last10: 8,
@@ -394,6 +436,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'nc-state', name: 'NC State', seed: 11, region: 'Midwest',
+    espnId: 152,
     adjOE: 113.4, adjDE: 109.2, adjTempo: 69.4,
     wins: 24, losses: 12, q1W: 4, q1L: 8, q2W: 5, q2L: 4, q3W: 9, q3L: 0, q4W: 6, q4L: 0,
     netRanking: 51, sos: 63, last10: 7,
@@ -403,6 +446,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'colorado-state', name: 'Colorado State', seed: 12, region: 'Midwest',
+    espnId: 36,
     adjOE: 111.8, adjDE: 110.2, adjTempo: 67.8,
     wins: 27, losses: 8, q1W: 2, q1L: 4, q2W: 4, q2L: 2, q3W: 10, q3L: 2, q4W: 11, q4L: 0,
     netRanking: 57, sos: 79, last10: 8,
@@ -412,6 +456,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'grand-canyon', name: 'Grand Canyon', seed: 13, region: 'Midwest',
+    espnId: 2253,
     adjOE: 109.8, adjDE: 112.8, adjTempo: 68.4,
     wins: 26, losses: 9, q1W: 1, q1L: 3, q2W: 3, q2L: 4, q3W: 10, q3L: 2, q4W: 12, q4L: 0,
     netRanking: 72, sos: 94, last10: 8,
@@ -421,6 +466,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'troy', name: 'Troy', seed: 14, region: 'Midwest',
+    espnId: 2653,
     adjOE: 107.8, adjDE: 115.2, adjTempo: 67.2,
     wins: 24, losses: 10, q1W: 0, q1L: 2, q2W: 2, q2L: 4, q3W: 9, q3L: 2, q4W: 13, q4L: 2,
     netRanking: 92, sos: 116, last10: 7,
@@ -430,6 +476,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'omaha', name: 'Omaha', seed: 15, region: 'Midwest',
+    espnId: 2437,
     adjOE: 104.8, adjDE: 117.2, adjTempo: 66.4,
     wins: 21, losses: 13, q1W: 0, q1L: 1, q2W: 1, q2L: 3, q3W: 8, q3L: 3, q4W: 12, q4L: 6,
     netRanking: 118, sos: 140, last10: 7,
@@ -439,6 +486,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'sfa', name: 'SFA', seed: 16, region: 'Midwest',
+    espnId: 2540,
     adjOE: 103.4, adjDE: 119.2, adjTempo: 67.8,
     wins: 19, losses: 15, q1W: 0, q1L: 1, q2W: 0, q2L: 2, q3W: 7, q3L: 5, q4W: 12, q4L: 7,
     netRanking: 148, sos: 170, last10: 6,
@@ -452,6 +500,7 @@ export const TEAMS: Team[] = [
   // ═══════════════════════════════════════════════════════════════
   {
     id: 'houston', name: 'Houston', seed: 1, region: 'West',
+    espnId: 248,
     adjOE: 118.2, adjDE: 91.6, adjTempo: 64.8,
     wins: 31, losses: 5, q1W: 12, q1L: 5, q2W: 9, q2L: 0, q3W: 8, q3L: 0, q4W: 2, q4L: 0,
     netRanking: 4, sos: 16, last10: 9,
@@ -461,6 +510,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'florida', name: 'Florida', seed: 2, region: 'West',
+    espnId: 57,
     adjOE: 119.4, adjDE: 96.2, adjTempo: 69.8,
     wins: 27, losses: 9, q1W: 9, q1L: 9, q2W: 7, q2L: 0, q3W: 8, q3L: 0, q4W: 3, q4L: 0,
     netRanking: 5, sos: 21, last10: 8,
@@ -470,6 +520,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'texas-tech', name: 'Texas Tech', seed: 3, region: 'West',
+    espnId: 2641,
     adjOE: 115.8, adjDE: 96.8, adjTempo: 66.2,
     wins: 25, losses: 9, q1W: 8, q1L: 8, q2W: 7, q2L: 1, q3W: 7, q3L: 0, q4W: 3, q4L: 0,
     netRanking: 13, sos: 29, last10: 8,
@@ -479,6 +530,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'marquette', name: 'Marquette', seed: 4, region: 'West',
+    espnId: 269,
     adjOE: 117.4, adjDE: 100.8, adjTempo: 71.8,
     wins: 26, losses: 10, q1W: 8, q1L: 9, q2W: 7, q2L: 1, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 19, sos: 35, last10: 7,
@@ -488,6 +540,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'clemson', name: 'Clemson', seed: 5, region: 'West',
+    espnId: 228,
     adjOE: 113.8, adjDE: 98.8, adjTempo: 67.8,
     wins: 24, losses: 11, q1W: 7, q1L: 9, q2W: 6, q2L: 2, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 25, sos: 37, last10: 7,
@@ -497,6 +550,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'pittsburgh', name: 'Pittsburgh', seed: 6, region: 'West',
+    espnId: 221,
     adjOE: 113.4, adjDE: 101.6, adjTempo: 70.8,
     wins: 22, losses: 12, q1W: 5, q1L: 10, q2W: 6, q2L: 2, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 33, sos: 42, last10: 7,
@@ -506,6 +560,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'dayton', name: 'Dayton', seed: 7, region: 'West',
+    espnId: 2196,
     adjOE: 113.8, adjDE: 103.8, adjTempo: 67.4,
     wins: 27, losses: 8, q1W: 5, q1L: 6, q2W: 6, q2L: 2, q3W: 10, q3L: 0, q4W: 6, q4L: 0,
     netRanking: 35, sos: 57, last10: 8,
@@ -515,6 +570,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'oklahoma', name: 'Oklahoma', seed: 8, region: 'West',
+    espnId: 201,
     adjOE: 112.4, adjDE: 105.4, adjTempo: 71.2,
     wins: 21, losses: 13, q1W: 4, q1L: 11, q2W: 6, q2L: 2, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 41, sos: 46, last10: 6,
@@ -524,6 +580,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'arkansas', name: 'Arkansas', seed: 9, region: 'West',
+    espnId: 8,
     adjOE: 112.2, adjDE: 106.8, adjTempo: 71.8,
     wins: 20, losses: 14, q1W: 4, q1L: 12, q2W: 5, q2L: 2, q3W: 7, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 44, sos: 48, last10: 6,
@@ -533,6 +590,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'notre-dame', name: 'Notre Dame', seed: 10, region: 'West',
+    espnId: 87,
     adjOE: 111.8, adjDE: 107.2, adjTempo: 69.4,
     wins: 22, losses: 13, q1W: 4, q1L: 10, q2W: 6, q2L: 3, q3W: 8, q3L: 0, q4W: 4, q4L: 0,
     netRanking: 48, sos: 60, last10: 7,
@@ -542,6 +600,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'mcneese', name: 'McNeese', seed: 11, region: 'West',
+    espnId: 2403,
     adjOE: 110.8, adjDE: 108.2, adjTempo: 71.4,
     wins: 30, losses: 5, q1W: 1, q1L: 3, q2W: 3, q2L: 2, q3W: 12, q3L: 0, q4W: 14, q4L: 0,
     netRanking: 52, sos: 76, last10: 9,
@@ -551,6 +610,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'colorado', name: 'Colorado', seed: 12, region: 'West',
+    espnId: 38,
     adjOE: 110.4, adjDE: 109.6, adjTempo: 68.8,
     wins: 24, losses: 12, q1W: 2, q1L: 7, q2W: 5, q2L: 4, q3W: 9, q3L: 1, q4W: 8, q4L: 0,
     netRanking: 58, sos: 80, last10: 7,
@@ -560,6 +620,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'unc-asheville', name: 'UNC Asheville', seed: 13, region: 'West',
+    espnId: 2462,
     adjOE: 108.8, adjDE: 113.2, adjTempo: 70.2,
     wins: 25, losses: 9, q1W: 0, q1L: 3, q2W: 2, q2L: 4, q3W: 10, q3L: 2, q4W: 13, q4L: 0,
     netRanking: 74, sos: 96, last10: 8,
@@ -569,6 +630,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'wofford', name: 'Wofford', seed: 14, region: 'West',
+    espnId: 2780,
     adjOE: 106.8, adjDE: 115.6, adjTempo: 66.8,
     wins: 23, losses: 10, q1W: 0, q1L: 2, q2W: 1, q2L: 4, q3W: 9, q3L: 2, q4W: 13, q4L: 2,
     netRanking: 94, sos: 118, last10: 7,
@@ -578,6 +640,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'norfolk-state', name: 'Norfolk State', seed: 15, region: 'West',
+    espnId: 2450,
     adjOE: 105.4, adjDE: 116.8, adjTempo: 68.4,
     wins: 22, losses: 12, q1W: 0, q1L: 1, q2W: 1, q2L: 3, q3W: 8, q3L: 3, q4W: 13, q4L: 5,
     netRanking: 120, sos: 142, last10: 7,
@@ -587,6 +650,7 @@ export const TEAMS: Team[] = [
   },
   {
     id: 'howard', name: 'Howard', seed: 16, region: 'West',
+    espnId: 47,
     adjOE: 102.4, adjDE: 120.2, adjTempo: 69.2,
     wins: 18, losses: 16, q1W: 0, q1L: 1, q2W: 0, q2L: 2, q3W: 6, q3L: 5, q4W: 12, q4L: 8,
     netRanking: 152, sos: 175, last10: 5,

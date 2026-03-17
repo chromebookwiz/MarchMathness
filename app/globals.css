@@ -2,100 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg-primary: #020817;
-  --bg-secondary: #050a18;
-  --bg-card: #0a1628;
-  --border: #1a2844;
-  --accent: #f59e0b;
-  --accent-dim: #92400e;
-}
-
-* {
+/* Hard corners everywhere — override any Tailwind rounded defaults */
+*, *::before, *::after {
   box-sizing: border-box;
+  border-radius: 0 !important;
 }
 
 body {
-  background-color: var(--bg-primary);
-  color: white;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #020817;
+  color: #e2e8f0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0a1628;
-}
-::-webkit-scrollbar-thumb {
-  background: #1a2844;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #f59e0b44;
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #030b18; }
+::-webkit-scrollbar-thumb { background: #1e3a5f; }
+::-webkit-scrollbar-thumb:hover { background: #f59e0b44; }
+
+/* ── Animations ── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
-.bracket-connector-right::after {
-  content: '';
-  position: absolute;
-  right: -12px;
-  top: 50%;
-  width: 12px;
-  height: 1px;
-  background: #1a3a6b;
-}
-
-.bracket-connector-left::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 50%;
-  width: 12px;
-  height: 1px;
-  background: #1a3a6b;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.fade-in {
-  animation: fadeIn 0.4s ease forwards;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
 }
 
 @keyframes progress-shine {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
 }
 
+@keyframes scanline {
+  0%   { top: -100%; }
+  100% { top: 100%;  }
+}
+
+/* ── CRT glow for champion numbers ── */
+.crt-glow {
+  text-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
+}
+
+/* ── Progress shine ── */
 .progress-shine {
   background: linear-gradient(
     90deg,
-    #f59e0b 0%,
-    #fbbf24 40%,
-    #fde68a 50%,
-    #fbbf24 60%,
-    #f59e0b 100%
+    #92400e 0%,
+    #f59e0b 40%,
+    #fbbf24 50%,
+    #f59e0b 60%,
+    #92400e 100%
   );
   background-size: 200% auto;
   animation: progress-shine 2s linear infinite;
 }
 
-.champion-glow {
-  box-shadow: 0 0 20px #f59e0b88, 0 0 40px #f59e0b44;
-  border-color: #f59e0b !important;
+/* ── Bracket connector lines ── */
+.connector-r::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  width: 2px;
+  height: 1px;
+  background: #1e3a5f;
 }
 
-.team-eliminated {
-  opacity: 0.35;
-  text-decoration: line-through;
-  text-decoration-color: #ef444488;
-}
+/* ── details/summary reset ── */
+details summary { cursor: pointer; }
+details summary::-webkit-details-marker { display: none; }
 
-.glass {
-  background: rgba(10, 22, 40, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(26, 40, 68, 0.8);
+/* ── Range input ── */
+input[type='range'] {
+  accent-color: #f59e0b;
+  cursor: pointer;
+}
+input[type='range']:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

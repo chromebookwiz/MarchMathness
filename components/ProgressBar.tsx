@@ -2,126 +2,122 @@
 
 import type { SimProgress, TrainingProgress } from '@/lib/types';
 
-interface ProgressBarProps {
-  progress: SimProgress;
-}
-
 const PHASE_LABELS: Record<string, string> = {
-  idle: 'Ready',
-  generating: 'Generating Season Data',
-  training: 'Training Model',
-  simulating: 'Running Simulations',
-  analyzing: 'Computing Statistics',
-  done: 'Analysis Complete',
+  idle:           'STANDBY',
+  fetching:       'FETCHING PLAYER DATA',
+  generating:     'GENERATING SEASON LOGS',
+  'training-lr':  'TRAINING — LOGISTIC REGRESSION',
+  'training-nn':  'TRAINING — NEURAL NETWORK',
+  'calibrating-elo': 'CALIBRATING ELO RATINGS',
+  simulating:     'RUNNING SIMULATIONS',
+  analyzing:      'AGGREGATING RESULTS',
+  done:           'ANALYSIS COMPLETE',
 };
 
-const PHASE_ICONS: Record<string, string> = {
-  idle: '●',
-  generating: '◈',
-  training: '⟳',
-  simulating: '▶',
-  analyzing: '≡',
-  done: '✓',
-};
-
-export default function ProgressBar({ progress }: ProgressBarProps) {
+export default function ProgressBar({ progress }: { progress: SimProgress }) {
   const { phase, overall, message, detail, training } = progress;
   const pct = Math.round(overall * 100);
+  const isDone = phase === 'done';
 
   return (
-    <div className="w-full space-y-3 p-4 rounded-xl border border-[#1a2844] bg-[#080f1f]">
-      {/* Phase indicator */}
-      <div className="flex items-center justify-between">
+    <div className="border border-[#1e3a5f] bg-[#040d1a]" style={{ fontFamily: 'monospace' }}>
+      {/* Top bar */}
+      <div className="flex items-center justify-between border-b border-[#1e3a5f] px-3 py-1.5">
         <div className="flex items-center gap-2">
-          <span
-            className={`text-lg font-mono ${phase === 'done' ? 'text-green-400' : 'text-amber-400 animate-spin'}`}
-            style={{ display: 'inline-block', animationDuration: '2s' }}
-          >
-            {PHASE_ICONS[phase] ?? '●'}
-          </span>
-          <span className="text-sm font-semibold text-slate-200 uppercase tracking-widest">
-            {PHASE_LABELS[phase] ?? phase}
-          </span>
-        </div>
-        <span className="text-lg font-bold font-mono text-amber-400">{pct}%</span>
-      </div>
-
-      {/* Main bar */}
-      <div className="w-full h-3 rounded-full bg-[#0d1a2e] overflow-hidden relative">
-        <div
-          className="h-full rounded-full transition-all duration-300 ease-out"
-          style={{
-            width: `${pct}%`,
-            background: phase === 'done'
-              ? 'linear-gradient(90deg, #22c55e, #4ade80)'
-              : 'linear-gradient(90deg, #b45309, #f59e0b, #fbbf24)',
-            backgroundSize: '200% auto',
-            animation: phase !== 'done' && phase !== 'idle' ? 'progress-shine 2s linear infinite' : 'none',
-          }}
-        />
-        {/* Shimmer overlay */}
-        {phase !== 'done' && phase !== 'idle' && (
           <div
-            className="absolute inset-0 opacity-30"
+            className="w-2 h-2"
             style={{
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
-              backgroundSize: '60% 100%',
-              animation: 'progress-shine 1.5s linear infinite',
+              background: isDone ? '#22c55e' : '#f59e0b',
+              animation: isDone ? 'none' : 'pulse 1s ease-in-out infinite',
             }}
           />
-        )}
+          <span className="text-xs font-bold tracking-[0.2em] text-slate-300">
+            {PHASE_LABELS[phase] ?? phase.toUpperCase()}
+          </span>
+        </div>
+        <span className="text-xl font-black text-amber-400 tabular-nums">{pct}%</span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="px-3 py-2">
+        <div className="w-full h-2 bg-[#0a1628] relative overflow-hidden">
+          <div
+            className="h-full transition-all duration-300"
+            style={{
+              width: `${pct}%`,
+              background: isDone
+                ? '#22c55e'
+                : `linear-gradient(90deg, #92400e 0%, #f59e0b ${pct > 20 ? '60%' : '100%'}, #fbbf24 100%)`,
+            }}
+          />
+          {/* Tick marks */}
+          {[25, 50, 75].map(tick => (
+            <div
+              key={tick}
+              className="absolute top-0 bottom-0 w-px bg-[#1e3a5f]"
+              style={{ left: `${tick}%` }}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between mt-0.5">
+          {[0, 25, 50, 75, 100].map(tick => (
+            <span key={tick} className="text-[9px] text-slate-700 tabular-nums">{tick}</span>
+          ))}
+        </div>
       </div>
 
       {/* Message */}
-      <div className="space-y-1">
-        <p className="text-sm text-slate-300 font-mono">{message}</p>
-        {detail && (
-          <p className="text-xs text-slate-500 font-mono">{detail}</p>
-        )}
+      <div className="px-3 pb-2 space-y-0.5">
+        <div className="text-xs text-slate-300">{message}</div>
+        {detail && <div className="text-[11px] text-slate-600">{detail}</div>}
       </div>
 
-      {/* Training details */}
-      {training && phase === 'training' && (
-        <TrainingDetails training={training} />
+      {/* Training metrics */}
+      {training && (phase === 'training-lr' || phase === 'training-nn') && (
+        <TrainingPanel training={training} />
       )}
     </div>
   );
 }
 
-function TrainingDetails({ training }: { training: TrainingProgress }) {
-  const { epoch, totalEpochs, loss, accuracy, lrDecay } = training;
+function TrainingPanel({ training }: { training: TrainingProgress }) {
+  const { epoch, totalEpochs, loss, accuracy, lrDecay, modelType } = training;
   const trainPct = Math.round((epoch / totalEpochs) * 100);
 
   return (
-    <div className="mt-2 p-3 rounded-lg bg-[#0a1628] border border-[#1a2844]">
-      {/* Epoch bar */}
-      <div className="flex justify-between text-xs text-slate-500 mb-1 font-mono">
-        <span>Epoch {epoch.toLocaleString()} / {totalEpochs.toLocaleString()}</span>
-        <span>LR scale: {lrDecay.toFixed(3)}</span>
+    <div className="border-t border-[#1e3a5f] mx-3 mb-3 pt-2">
+      <div className="grid grid-cols-4 gap-1 mb-2">
+        <MetricCell label="EPOCH" value={`${epoch}/${totalEpochs}`} />
+        <MetricCell label="LOSS" value={loss.toFixed(4)} highlight={loss < 0.45} />
+        <MetricCell label="ACCURACY" value={`${(accuracy * 100).toFixed(1)}%`} highlight={accuracy > 0.65} />
+        <MetricCell label="LR SCALE" value={lrDecay.toFixed(3)} />
       </div>
-      <div className="w-full h-1.5 rounded-full bg-[#0d1a2e] overflow-hidden mb-3">
-        <div
-          className="h-full rounded-full bg-blue-500 transition-all duration-200"
-          style={{ width: `${trainPct}%` }}
-        />
-      </div>
-
-      {/* Metrics grid */}
-      <div className="grid grid-cols-3 gap-3">
-        <MetricBox label="Loss" value={loss.toFixed(4)} delta={loss < 0.5 ? '↓' : '→'} />
-        <MetricBox label="Accuracy" value={`${(accuracy * 100).toFixed(1)}%`} delta={accuracy > 0.65 ? '↑' : '→'} />
-        <MetricBox label="Samples" value="~2.2K" delta="●" />
+      <div className="flex items-center gap-2">
+        <span className="text-[9px] text-slate-700 uppercase tracking-widest w-16">
+          {modelType === 'neural' ? 'NN' : 'LR'} EPOCH
+        </span>
+        <div className="flex-1 h-1 bg-[#0a1628] relative">
+          <div
+            className="h-full transition-all duration-100"
+            style={{ width: `${trainPct}%`, background: modelType === 'neural' ? '#3b82f6' : '#f59e0b' }}
+          />
+        </div>
+        <span className="text-[9px] text-slate-600 tabular-nums w-8">{trainPct}%</span>
       </div>
     </div>
   );
 }
 
-function MetricBox({ label, value, delta }: { label: string; value: string; delta: string }) {
+function MetricCell({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="text-center p-2 rounded bg-[#0d1f3c]">
-      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">{label}</div>
-      <div className="text-sm font-bold font-mono text-slate-200">{value}</div>
-      <div className="text-xs text-amber-400">{delta}</div>
+    <div className="bg-[#08111e] px-2 py-1 border border-[#0d1e30]">
+      <div className="text-[8px] text-slate-600 uppercase tracking-widest">{label}</div>
+      <div
+        className="text-xs font-bold tabular-nums mt-0.5"
+        style={{ color: highlight ? '#22c55e' : '#94a3b8' }}
+      >
+        {value}
+      </div>
     </div>
   );
 }

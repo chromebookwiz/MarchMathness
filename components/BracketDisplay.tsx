@@ -1,9 +1,10 @@
 'use client';
 
-import { SLOT_H, ROUND_W, COL_GAP, REGION_H, gameTopPx, seedColor, winProbColor } from '@/lib/bracket';
+import { SLOT_H, ROUND_W, REGION_H, gameTopPx, seedColor, winProbColor } from '@/lib/bracket';
 import type { DisplayBracket, DisplayGame } from '@/lib/simulation';
-import type { Team } from '@/lib/types';
+import type { Team, Player } from '@/lib/types';
 import type { ConsensusData } from '@/lib/simulation';
+import { useState } from 'react';
 
 interface Props {
   bracket: DisplayBracket;
@@ -12,79 +13,89 @@ interface Props {
 }
 
 export default function BracketDisplay({ bracket, consensus, champion }: Props) {
+  const [hoveredTeam, setHoveredTeam] = useState<Team | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
   return (
-    <div className="w-full overflow-x-auto pb-6">
+    <div className="w-full overflow-x-auto pb-6 relative" style={{ fontFamily: 'monospace' }}>
+      {/* Scanline overlay */}
+      <div
+        className="pointer-events-none absolute inset-0 z-50 opacity-[0.03]"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.8) 2px, rgba(255,255,255,0.8) 3px)',
+        }}
+      />
+
       <div
         className="inline-flex items-start gap-0 min-w-max mx-auto"
-        style={{ paddingTop: '2rem', paddingBottom: '2rem' }}
+        style={{ paddingTop: '2.5rem', paddingBottom: '2.5rem' }}
+        onMouseLeave={() => setHoveredTeam(null)}
       >
-        {/* LEFT HALF: East (top) + South (bottom) → R64 to E8 */}
-        <div className="flex flex-col gap-4">
-          <RegionLabel name="EAST" align="left" />
-          <RegionHalf rounds={bracket.east} direction="ltr" regionIdx={0} />
-          <div style={{ height: 16 }} />
-          <RegionLabel name="SOUTH" align="left" />
-          <RegionHalf rounds={bracket.south} direction="ltr" regionIdx={1} />
+        {/* LEFT: East (top) + South (bottom) */}
+        <div className="flex flex-col" style={{ gap: 20 }}>
+          <RegionLabel name="EAST" />
+          <RegionHalf rounds={bracket.east} direction="ltr" onHover={setHoveredTeam} setPos={setTooltipPos} />
+          <RegionLabel name="SOUTH" />
+          <RegionHalf rounds={bracket.south} direction="ltr" onHover={setHoveredTeam} setPos={setTooltipPos} />
         </div>
 
-        {/* CENTER: Final Four + Championship */}
-        <div className="flex flex-col items-center justify-center" style={{ minWidth: 240, paddingTop: (REGION_H / 2) - SLOT_H }}>
-          <div className="text-xs font-bold text-amber-500 uppercase tracking-[0.2em] mb-3">Final Four</div>
+        {/* CENTER */}
+        <CenterColumn
+          bracket={bracket}
+          consensus={consensus}
+          champion={champion}
+          onHover={setHoveredTeam}
+          setPos={setTooltipPos}
+        />
 
-          <FFGame game={bracket.finalFour[0]} consensus={consensus} label="East vs South" />
-          <div className="my-4 text-center">
-            <div className="text-xs text-slate-600 uppercase tracking-widest mb-2">National Championship</div>
-            <ChampionshipGame game={bracket.championship} consensus={consensus} champion={champion} />
-          </div>
-          <FFGame game={bracket.finalFour[1]} consensus={consensus} label="Midwest vs West" />
-        </div>
-
-        {/* RIGHT HALF: Midwest (top) + West (bottom) → E8 to R64 */}
-        <div className="flex flex-col gap-4">
-          <RegionLabel name="MIDWEST" align="right" />
-          <RegionHalf rounds={bracket.midwest} direction="rtl" regionIdx={2} />
-          <div style={{ height: 16 }} />
-          <RegionLabel name="WEST" align="right" />
-          <RegionHalf rounds={bracket.west} direction="rtl" regionIdx={3} />
+        {/* RIGHT: Midwest (top) + West (bottom) */}
+        <div className="flex flex-col" style={{ gap: 20 }}>
+          <RegionLabel name="MIDWEST" right />
+          <RegionHalf rounds={bracket.midwest} direction="rtl" onHover={setHoveredTeam} setPos={setTooltipPos} />
+          <RegionLabel name="WEST" right />
+          <RegionHalf rounds={bracket.west} direction="rtl" onHover={setHoveredTeam} setPos={setTooltipPos} />
         </div>
       </div>
+
+      {/* Player tooltip */}
+      {hoveredTeam && (
+        <PlayerTooltip team={hoveredTeam} x={tooltipPos.x} y={tooltipPos.y} />
+      )}
     </div>
   );
 }
 
-function RegionLabel({ name, align }: { name: string; align: 'left' | 'right' }) {
+function RegionLabel({ name, right = false }: { name: string; right?: boolean }) {
   return (
-    <div className={`text-xs font-bold text-slate-500 uppercase tracking-[0.25em] ${align === 'right' ? 'text-right' : 'text-left'}`}>
+    <div
+      className="text-[9px] font-bold tracking-[0.3em] text-slate-600 border-b border-[#0d1e30] pb-1"
+      style={{ textAlign: right ? 'right' : 'left' }}
+    >
       {name}
     </div>
   );
 }
 
-// Renders 4 rounds of a region. Direction: ltr = R64 on left → E8 on right, rtl = reversed.
 function RegionHalf({
-  rounds,
-  direction,
-  regionIdx,
+  rounds, direction, onHover, setPos,
 }: {
   rounds: DisplayGame[][];
   direction: 'ltr' | 'rtl';
-  regionIdx: number;
+  onHover: (t: Team | null) => void;
+  setPos: (p: { x: number; y: number }) => void;
 }) {
-  const orderedRounds = direction === 'rtl' ? [...rounds].reverse() : rounds;
-
+  const ordered = direction === 'rtl' ? [...rounds].reverse() : rounds;
   return (
-    <div
-      className="relative flex gap-[2px]"
-      style={{ height: REGION_H }}
-    >
-      {orderedRounds.map((games, displayColIdx) => {
-        const actualRoundIdx = direction === 'rtl' ? 3 - displayColIdx : displayColIdx;
+    <div className="relative flex" style={{ height: REGION_H, gap: 1 }}>
+      {ordered.map((games, col) => {
+        const roundIdx = direction === 'rtl' ? 3 - col : col;
         return (
-          <RoundColumn
-            key={actualRoundIdx}
+          <RoundCol
+            key={col}
             games={games}
-            roundIdx={actualRoundIdx}
-            direction={direction}
+            roundIdx={roundIdx}
+            onHover={onHover}
+            setPos={setPos}
           />
         );
       })}
@@ -92,259 +103,438 @@ function RegionHalf({
   );
 }
 
-function RoundColumn({
-  games,
-  roundIdx,
-  direction,
+function RoundCol({
+  games, roundIdx, onHover, setPos,
 }: {
   games: DisplayGame[];
   roundIdx: number;
-  direction: 'ltr' | 'rtl';
+  onHover: (t: Team | null) => void;
+  setPos: (p: { x: number; y: number }) => void;
 }) {
   return (
-    <div
-      className="relative flex-shrink-0"
-      style={{ width: ROUND_W, height: REGION_H }}
-    >
-      {games.map((game, gi) => {
-        const top = gameTopPx(roundIdx, gi);
-        return (
-          <div
-            key={game.id}
-            className="absolute"
-            style={{ top, width: ROUND_W, height: SLOT_H * 2 }}
-          >
-            <GameCard game={game} compact />
-          </div>
-        );
-      })}
+    <div className="relative flex-shrink-0" style={{ width: ROUND_W, height: REGION_H }}>
+      {games.map((game, gi) => (
+        <div
+          key={game.id}
+          className="absolute"
+          style={{ top: gameTopPx(roundIdx, gi), width: ROUND_W }}
+        >
+          <GameCard game={game} onHover={onHover} setPos={setPos} />
+        </div>
+      ))}
     </div>
   );
 }
 
-function GameCard({ game, compact = false }: { game: DisplayGame; compact?: boolean }) {
-  const { teamA, teamB, winner } = game;
+function GameCard({
+  game, onHover, setPos,
+}: {
+  game: DisplayGame;
+  onHover: (t: Team | null) => void;
+  setPos: (p: { x: number; y: number }) => void;
+}) {
+  const { teamA, teamB } = game;
   if (!teamA || !teamB) return null;
-
   return (
     <div
-      className="flex flex-col overflow-hidden rounded border border-[#172236]"
-      style={{ height: SLOT_H * 2, width: '100%' }}
+      className="overflow-hidden"
+      style={{
+        height: SLOT_H * 2,
+        border: '1px solid #0d1e30',
+        background: '#050a14',
+      }}
     >
-      <TeamRow team={teamA} isWinner={winner?.id === teamA.id} probWin={game.winProbA} consensus={game.teamAConsensus} />
-      <div className="border-t border-[#172236]" />
-      <TeamRow team={teamB} isWinner={winner?.id === teamB.id} probWin={1 - game.winProbA} consensus={game.teamBConsensus} />
+      <TeamRow
+        team={teamA}
+        isWinner={game.winner?.id === teamA.id}
+        prob={game.winProbA}
+        consensus={game.teamAConsensus}
+        onHover={onHover}
+        setPos={setPos}
+      />
+      <div style={{ height: 1, background: '#0d1e30' }} />
+      <TeamRow
+        team={teamB}
+        isWinner={game.winner?.id === teamB.id}
+        prob={1 - game.winProbA}
+        consensus={game.teamBConsensus}
+        onHover={onHover}
+        setPos={setPos}
+      />
     </div>
   );
 }
 
 function TeamRow({
-  team,
-  isWinner,
-  probWin,
-  consensus,
-}: {
-  team: Team;
-  isWinner: boolean;
-  probWin: number;
-  consensus?: number;
-}) {
-  const bg = isWinner ? '#0f1e35' : '#080e1c';
-  const textOpacity = isWinner ? '1' : '0.55';
-  const barColor = winProbColor(probWin);
-
-  return (
-    <div
-      className="relative flex items-center overflow-hidden"
-      style={{ height: SLOT_H, background: bg, cursor: 'default' }}
-    >
-      {/* Win probability bar (background) */}
-      <div
-        className="absolute left-0 top-0 bottom-0 opacity-10"
-        style={{ width: `${Math.round(probWin * 100)}%`, background: barColor }}
-      />
-
-      {/* Seed badge */}
-      <div
-        className="flex-shrink-0 w-5 text-center font-bold font-mono"
-        style={{ fontSize: 9, color: seedColor(team.seed), marginLeft: 4 }}
-      >
-        {team.seed}
-      </div>
-
-      {/* Name */}
-      <div
-        className="flex-1 truncate font-medium"
-        style={{
-          fontSize: 10,
-          opacity: textOpacity,
-          color: isWinner ? '#e2e8f0' : '#94a3b8',
-          paddingLeft: 4,
-          paddingRight: 2,
-          letterSpacing: '0.01em',
-        }}
-      >
-        {team.name}
-      </div>
-
-      {/* Consensus % or win prob */}
-      <div className="flex-shrink-0 pr-1 text-right">
-        {consensus !== undefined ? (
-          <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, fontFamily: 'monospace' }}>
-            {consensus.toFixed(0)}%
-          </span>
-        ) : (
-          <span style={{ fontSize: 9, color: barColor, fontFamily: 'monospace' }}>
-            {Math.round(probWin * 100)}%
-          </span>
-        )}
-      </div>
-
-      {/* Winner indicator */}
-      {isWinner && (
-        <div
-          className="absolute right-0 top-0 bottom-0 w-0.5"
-          style={{ background: barColor }}
-        />
-      )}
-    </div>
-  );
-}
-
-function FFGame({
-  game,
-  consensus,
-  label,
-}: {
-  game: DisplayGame;
-  consensus: ConsensusData | null;
-  label: string;
-}) {
-  const { teamA, teamB, winner } = game;
-  if (!teamA || !teamB) return null;
-
-  return (
-    <div className="mb-2">
-      <div className="text-xs text-slate-600 uppercase tracking-widest mb-1 text-center">{label}</div>
-      <div
-        className="rounded-lg border border-[#1e3058] overflow-hidden"
-        style={{ width: 200 }}
-      >
-        <FFTeamRow team={teamA} isWinner={winner?.id === teamA.id} prob={game.winProbA} consensus={game.teamAConsensus} />
-        <div className="border-t border-[#1e3058]" />
-        <FFTeamRow team={teamB} isWinner={winner?.id === teamB.id} prob={1 - game.winProbA} consensus={game.teamBConsensus} />
-      </div>
-    </div>
-  );
-}
-
-function FFTeamRow({
-  team,
-  isWinner,
-  prob,
-  consensus,
+  team, isWinner, prob, consensus, onHover, setPos,
 }: {
   team: Team;
   isWinner: boolean;
   prob: number;
   consensus?: number;
+  onHover: (t: Team | null) => void;
+  setPos: (p: { x: number; y: number }) => void;
 }) {
+  const barColor = winProbColor(prob);
+  const pctDisplay = consensus !== undefined
+    ? `${consensus.toFixed(0)}%`
+    : `${Math.round(prob * 100)}%`;
+
   return (
     <div
-      className="flex items-center gap-2 px-3 py-2"
-      style={{ background: isWinner ? '#0f2040' : '#080e1c' }}
+      className="relative flex items-center overflow-hidden cursor-default"
+      style={{
+        height: SLOT_H,
+        background: isWinner ? '#091626' : '#050a14',
+        borderLeft: isWinner ? `2px solid ${barColor}` : '2px solid transparent',
+      }}
+      onMouseEnter={e => {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setPos({ x: rect.right + 8, y: rect.top });
+        onHover(team);
+      }}
+      onMouseLeave={() => onHover(null)}
     >
+      {/* Probability bar bg */}
+      <div
+        className="absolute left-0 top-0 bottom-0 opacity-[0.07]"
+        style={{ width: `${Math.round(prob * 100)}%`, background: barColor }}
+      />
+
+      {/* Seed */}
       <span
-        className="font-bold font-mono text-xs w-4 text-center"
-        style={{ color: seedColor(team.seed) }}
+        className="flex-shrink-0 text-center font-bold tabular-nums"
+        style={{ fontSize: 9, color: seedColor(team.seed), width: 18, paddingLeft: 2 }}
       >
         {team.seed}
       </span>
+
+      {/* Name */}
       <span
-        className="flex-1 text-sm font-medium truncate"
-        style={{ color: isWinner ? '#e2e8f0' : '#64748b' }}
+        className="flex-1 truncate"
+        style={{
+          fontSize: 10,
+          color: isWinner ? '#cbd5e1' : '#475569',
+          paddingLeft: 3,
+          paddingRight: 2,
+          fontWeight: isWinner ? 600 : 400,
+          letterSpacing: '0.02em',
+          textDecoration: (!isWinner && team.seed <= 8) ? undefined : undefined,
+        }}
       >
         {team.name}
       </span>
-      <span className="text-xs font-mono" style={{ color: winProbColor(prob) }}>
+
+      {/* Pct */}
+      <span
+        className="flex-shrink-0 pr-1 tabular-nums font-bold"
+        style={{ fontSize: 9, color: consensus !== undefined ? '#f59e0b' : barColor }}
+      >
+        {pctDisplay}
+      </span>
+    </div>
+  );
+}
+
+function CenterColumn({
+  bracket, consensus, champion, onHover, setPos,
+}: {
+  bracket: DisplayBracket;
+  consensus: ConsensusData | null;
+  champion: Team | null;
+  onHover: (t: Team | null) => void;
+  setPos: (p: { x: number; y: number }) => void;
+}) {
+  const halfH = REGION_H;
+  const totalH = halfH * 2 + 20;
+
+  return (
+    <div
+      className="flex flex-col items-center justify-center"
+      style={{
+        minWidth: 230,
+        paddingTop: halfH / 2 - SLOT_H * 2,
+        height: totalH,
+      }}
+    >
+      <div className="text-[9px] tracking-[0.3em] text-slate-700 mb-2 uppercase">Final Four</div>
+
+      <FFGameBlock game={bracket.finalFour[0]} label="EAST · SOUTH" onHover={onHover} setPos={setPos} />
+
+      <div className="my-3 w-full">
+        <ChampBlock game={bracket.championship} champion={champion} consensus={consensus} onHover={onHover} setPos={setPos} />
+      </div>
+
+      <FFGameBlock game={bracket.finalFour[1]} label="MIDWEST · WEST" onHover={onHover} setPos={setPos} />
+    </div>
+  );
+}
+
+function FFGameBlock({
+  game, label, onHover, setPos,
+}: {
+  game: DisplayGame;
+  label: string;
+  onHover: (t: Team | null) => void;
+  setPos: (p: { x: number; y: number }) => void;
+}) {
+  const { teamA, teamB, winner } = game;
+  if (!teamA || !teamB) return null;
+  return (
+    <div style={{ width: 210 }}>
+      <div className="text-[8px] tracking-[0.2em] text-slate-700 mb-1">{label}</div>
+      <div style={{ border: '1px solid #1e3a5f', background: '#050e1c' }}>
+        <FFRow
+          team={teamA} isWinner={winner?.id === teamA.id}
+          prob={game.winProbA} consensus={game.teamAConsensus}
+          onHover={onHover} setPos={setPos}
+        />
+        <div style={{ height: 1, background: '#1e3a5f' }} />
+        <FFRow
+          team={teamB} isWinner={winner?.id === teamB.id}
+          prob={1 - game.winProbA} consensus={game.teamBConsensus}
+          onHover={onHover} setPos={setPos}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FFRow({
+  team, isWinner, prob, consensus, onHover, setPos,
+}: {
+  team: Team; isWinner: boolean; prob: number; consensus?: number;
+  onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
+}) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 cursor-default"
+      style={{
+        height: 30,
+        background: isWinner ? '#0c1f38' : '#050e1c',
+        borderLeft: isWinner ? `3px solid ${winProbColor(prob)}` : '3px solid transparent',
+      }}
+      onMouseEnter={e => {
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setPos({ x: r.right + 8, y: r.top });
+        onHover(team);
+      }}
+      onMouseLeave={() => onHover(null)}
+    >
+      <span className="font-bold tabular-nums" style={{ fontSize: 10, color: seedColor(team.seed), width: 16 }}>
+        {team.seed}
+      </span>
+      <span className="flex-1 truncate text-xs font-medium" style={{ color: isWinner ? '#e2e8f0' : '#475569' }}>
+        {team.name}
+      </span>
+      <span className="text-xs font-bold tabular-nums" style={{ color: winProbColor(prob) }}>
         {consensus !== undefined ? `${consensus.toFixed(0)}%` : `${Math.round(prob * 100)}%`}
       </span>
     </div>
   );
 }
 
-function ChampionshipGame({
-  game,
-  consensus,
-  champion,
+function ChampBlock({
+  game, champion, consensus, onHover, setPos,
 }: {
-  game: DisplayGame;
-  consensus: ConsensusData | null;
-  champion: Team | null;
+  game: DisplayGame; champion: Team | null; consensus: ConsensusData | null;
+  onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
 }) {
   const { teamA, teamB, winner } = game;
   if (!teamA || !teamB) return null;
-
   return (
     <div
-      className="rounded-xl border-2 overflow-hidden"
       style={{
-        width: 220,
-        borderColor: '#f59e0b',
-        boxShadow: '0 0 30px #f59e0b44, 0 0 60px #f59e0b22',
+        border: '2px solid #f59e0b',
+        background: '#08060a',
+        boxShadow: '0 0 24px #f59e0b22, inset 0 0 12px #f59e0b08',
       }}
     >
-      <div className="text-center py-1.5 text-xs font-bold text-amber-400 uppercase tracking-widest" style={{ background: '#1a0e00' }}>
+      {/* Header */}
+      <div
+        className="text-center py-1 text-[9px] font-bold tracking-[0.3em] uppercase"
+        style={{ background: '#0f0900', color: '#f59e0b', borderBottom: '1px solid #f59e0b44' }}
+      >
         National Championship
       </div>
-      <ChampTeamRow team={teamA} isWinner={winner?.id === teamA.id} prob={game.winProbA} consensus={game.teamAConsensus} />
-      <div className="border-t border-[#3d2200]" />
-      <ChampTeamRow team={teamB} isWinner={winner?.id === teamB.id} prob={1 - game.winProbA} consensus={game.teamBConsensus} />
+
+      {[teamA, teamB].map(t => (
+        <div key={t.id}>
+          <ChampRow
+            team={t}
+            isWinner={winner?.id === t.id}
+            prob={t === teamA ? game.winProbA : 1 - game.winProbA}
+            consensus={t === teamA ? game.teamAConsensus : game.teamBConsensus}
+            onHover={onHover}
+            setPos={setPos}
+          />
+          {t === teamA && <div style={{ height: 1, background: '#f59e0b22' }} />}
+        </div>
+      ))}
+
       {winner && (
         <div
-          className="text-center py-2 text-xs font-bold uppercase tracking-widest"
-          style={{ background: '#1a0e00', color: '#f59e0b' }}
+          className="text-center py-1.5 text-xs font-black tracking-[0.15em] uppercase"
+          style={{ background: '#100800', color: '#fbbf24', borderTop: '1px solid #f59e0b44' }}
         >
-          🏆 {winner.name}
+          CHAMPION: {winner.name}
+          {consensus && (
+            <span className="ml-2 text-amber-600">
+              ({(((consensus.championFreq.get(winner.id) ?? 0) / consensus.totalSims) * 100).toFixed(1)}%)
+            </span>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function ChampTeamRow({
-  team,
-  isWinner,
-  prob,
-  consensus,
+function ChampRow({
+  team, isWinner, prob, consensus, onHover, setPos,
 }: {
-  team: Team;
-  isWinner: boolean;
-  prob: number;
-  consensus?: number;
+  team: Team; isWinner: boolean; prob: number; consensus?: number;
+  onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
 }) {
   return (
     <div
-      className="flex items-center gap-2 px-3 py-2.5"
-      style={{ background: isWinner ? '#1a1000' : '#08090e' }}
+      className="flex items-center gap-2 px-3 cursor-default"
+      style={{
+        height: 36,
+        background: isWinner ? '#160c00' : '#08060a',
+        borderLeft: isWinner ? '3px solid #f59e0b' : '3px solid transparent',
+      }}
+      onMouseEnter={e => {
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setPos({ x: r.right + 8, y: r.top });
+        onHover(team);
+      }}
+      onMouseLeave={() => onHover(null)}
     >
-      <span
-        className="font-bold font-mono text-sm w-5 text-center"
-        style={{ color: seedColor(team.seed) }}
-      >
+      <span className="font-bold tabular-nums" style={{ fontSize: 11, color: seedColor(team.seed), width: 18 }}>
         {team.seed}
       </span>
-      <span
-        className="flex-1 text-sm font-bold truncate"
-        style={{ color: isWinner ? '#fbbf24' : '#475569' }}
-      >
+      <span className="flex-1 truncate font-bold" style={{ fontSize: 12, color: isWinner ? '#fbbf24' : '#475569' }}>
         {team.name}
       </span>
-      <span
-        className="text-sm font-bold font-mono"
-        style={{ color: isWinner ? '#f59e0b' : '#64748b' }}
+      <span className="text-sm font-bold tabular-nums" style={{ color: isWinner ? '#f59e0b' : '#334155' }}>
+        {consensus !== undefined ? `${consensus.toFixed(1)}%` : `${Math.round(prob * 100)}%`}
+      </span>
+    </div>
+  );
+}
+
+// ── Player tooltip ────────────────────────────────────────────────────────
+
+function PlayerTooltip({ team, x, y }: { team: Team; x: number; y: number }) {
+  const players = team.roster ?? [];
+  const starters = players.filter(p => p.isStarter).slice(0, 5);
+  const bench = players.filter(p => !p.isStarter).slice(0, 3);
+
+  return (
+    <div
+      className="fixed z-[9999] pointer-events-none"
+      style={{
+        left: Math.min(x, window.innerWidth - 260),
+        top: Math.max(8, Math.min(y - 20, window.innerHeight - 320)),
+        width: 248,
+        border: '1px solid #1e3a5f',
+        background: '#040d1a',
+        fontFamily: 'monospace',
+      }}
+    >
+      {/* Team header */}
+      <div
+        className="px-2 py-1 flex items-center justify-between"
+        style={{ background: '#050e1c', borderBottom: '1px solid #1e3a5f' }}
       >
-        {consensus !== undefined ? `${consensus.toFixed(0)}%` : `${Math.round(prob * 100)}%`}
+        <div>
+          <span className="text-[9px] tracking-widest text-slate-600 uppercase">{team.region} • #{team.seed}</span>
+          <div className="text-xs font-bold text-slate-200">{team.name}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[9px] text-slate-600">NET</div>
+          <div className="text-sm font-black text-amber-400">{team.netRanking}</div>
+        </div>
+      </div>
+
+      {/* Team stats mini-row */}
+      <div className="grid grid-cols-4 gap-0 border-b border-[#1e3a5f]">
+        {[
+          { l: 'ADJOE', v: team.adjOE.toFixed(1) },
+          { l: 'ADJDE', v: team.adjDE.toFixed(1) },
+          { l: 'TEMPO', v: team.adjTempo.toFixed(1) },
+          { l: 'W-L', v: `${team.wins}-${team.losses}` },
+        ].map(s => (
+          <div key={s.l} className="text-center py-1 border-r border-[#1e3a5f] last:border-r-0">
+            <div className="text-[7px] text-slate-700 uppercase">{s.l}</div>
+            <div className="text-[10px] font-bold text-slate-400">{s.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Players */}
+      {players.length > 0 ? (
+        <>
+          <PlayerHeader />
+          {starters.map(p => <PlayerRow key={p.id} player={p} starter />)}
+          {bench.length > 0 && (
+            <>
+              <div className="text-[8px] text-slate-700 px-2 py-0.5 bg-[#040a14] uppercase tracking-widest">Bench</div>
+              {bench.map(p => <PlayerRow key={p.id} player={p} starter={false} />)}
+            </>
+          )}
+        </>
+      ) : (
+        <div className="px-2 py-2 text-[10px] text-slate-600">
+          Loading player data...
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlayerHeader() {
+  return (
+    <div className="grid px-2 py-0.5 bg-[#030810]" style={{ gridTemplateColumns: '1fr 28px 28px 28px 28px 30px' }}>
+      <span className="text-[7px] text-slate-700 uppercase">PLAYER</span>
+      <span className="text-[7px] text-slate-700 text-right">PTS</span>
+      <span className="text-[7px] text-slate-700 text-right">REB</span>
+      <span className="text-[7px] text-slate-700 text-right">AST</span>
+      <span className="text-[7px] text-slate-700 text-right">USG</span>
+      <span className="text-[7px] text-slate-700 text-right">TS%</span>
+    </div>
+  );
+}
+
+function PlayerRow({ player: p, starter }: { player: Player; starter: boolean }) {
+  return (
+    <div
+      className="grid px-2 py-0.5"
+      style={{
+        gridTemplateColumns: '1fr 28px 28px 28px 28px 30px',
+        background: starter ? '#050e1c' : '#040a14',
+        borderBottom: '1px solid #0a1628',
+      }}
+    >
+      <div className="truncate">
+        <span className="text-[9px] font-bold" style={{ color: starter ? '#94a3b8' : '#475569' }}>
+          {p.name.split(' ').slice(-1)[0]}
+        </span>
+        <span className="text-[8px] text-slate-700 ml-1">{p.position}</span>
+      </div>
+      <span className="text-[9px] text-right tabular-nums" style={{ color: p.ppg >= 15 ? '#f59e0b' : '#64748b' }}>
+        {p.ppg.toFixed(1)}
+      </span>
+      <span className="text-[9px] text-right tabular-nums text-slate-600">{p.rpg.toFixed(1)}</span>
+      <span className="text-[9px] text-right tabular-nums text-slate-600">{p.apg.toFixed(1)}</span>
+      <span className="text-[9px] text-right tabular-nums text-slate-700">
+        {(p.usageRate * 100).toFixed(0)}%
+      </span>
+      <span
+        className="text-[9px] text-right tabular-nums"
+        style={{ color: p.trueShootingPct > 0.58 ? '#22c55e' : p.trueShootingPct > 0.52 ? '#64748b' : '#ef4444' }}
+      >
+        {(p.trueShootingPct * 100).toFixed(0)}%
       </span>
     </div>
   );
