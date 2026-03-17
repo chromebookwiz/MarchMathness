@@ -25,7 +25,7 @@ export interface TeamSeasonStats {
 
 const API_BASE = 'https://www.balldontlie.io/api/v1';
 
-async function fetchAllGamesForSeason(season: number): Promise<GameRecord[]> {
+async function fetchAllGamesForSeason(season: number, maxPages = 20): Promise<GameRecord[]> {
   const games: GameRecord[] = [];
   let page = 1;
 
@@ -36,7 +36,9 @@ async function fetchAllGamesForSeason(season: number): Promise<GameRecord[]> {
     const data = body.data as GameRecord[];
     if (!data?.length) break;
     games.push(...data);
-    if (page >= body.meta?.total_pages) break;
+
+    const totalPages = body.meta?.total_pages ?? page;
+    if (page >= totalPages || page >= maxPages) break;
     page += 1;
   }
 
@@ -45,9 +47,10 @@ async function fetchAllGamesForSeason(season: number): Promise<GameRecord[]> {
 
 export async function fetchHistoricalSeasonStats(seasons: number[]): Promise<TeamSeasonStats[]> {
   const allStats: TeamSeasonStats[] = [];
+  const maxPages = Number(process.env.HISTORICAL_MAX_PAGES ?? 20);
 
   for (const season of seasons) {
-    const games = await fetchAllGamesForSeason(season);
+    const games = await fetchAllGamesForSeason(season, maxPages);
     const statsMap = new Map<number, TeamSeasonStats>();
 
     for (const g of games) {
@@ -111,8 +114,9 @@ export interface GameOutcome {
 
 export async function fetchHistoricalOutcomes(seasons: number[]): Promise<GameOutcome[]> {
   const output: GameOutcome[] = [];
+  const maxPages = Number(process.env.HISTORICAL_MAX_PAGES ?? 20);
   for (const season of seasons) {
-    const games = await fetchAllGamesForSeason(season);
+    const games = await fetchAllGamesForSeason(season, maxPages);
     for (const g of games) {
       const homeName = g.home_team.full_name || g.home_team.name;
       const awayName = g.visitor_team.full_name || g.visitor_team.name;
