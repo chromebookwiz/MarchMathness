@@ -51,6 +51,7 @@ export default function Home() {
       const { fetchAllRosters } = await import('@/lib/espn');
       const { fetchMarketOdds } = await import('@/lib/odds');
       const { fetchSentimentScores } = await import('@/lib/sentiment');
+      const { fetchHistoricalOutcomes, buildHistoricalSamples } = await import('@/lib/historical');
 
       const regionTeams = buildRegionTeams();
       const allTeams    = regionTeams.flat();
@@ -99,7 +100,13 @@ export default function Home() {
       });
       await showPhase(150);
 
-      const samples   = generateTrainingSamples(allTeams);
+      const sentiment = await fetchSentimentScores(allTeams);
+
+      // Historical training data (2020–2025)
+      const historicalOutcomes = await fetchHistoricalOutcomes([2020, 2021, 2022, 2023, 2024, 2025]);
+      const historicalSamples = buildHistoricalSamples(allTeams, historicalOutcomes, sentiment);
+
+      const samples   = await generateTrainingSamples(allTeams, sentiment, historicalSamples);
       const samplesNN = [...samples];
 
       setProgress({
@@ -176,8 +183,8 @@ export default function Home() {
       await showPhase(150);
 
       const marketOdds = await fetchMarketOdds(allTeams);
-      const sentiment = await fetchSentimentScores(allTeams);
 
+      // Use the previously generated samples for model stats.
       const stats = computeModelStats(lrWeights, samples, lrFinalLoss, lrFinalAcc, nnFinalAcc);
       setModelStats(stats);
 

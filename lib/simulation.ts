@@ -160,13 +160,28 @@ export function ensembleWinProb(
 
 export interface GameSample { features: number[]; label: number; }
 
-export function generateTrainingSamples(teams: Team[]): GameSample[] {
+export async function generateTrainingSamples(
+  teams: Team[],
+  sentiment?: Map<string, number>,
+  historicalSamples?: GameSample[],
+): Promise<GameSample[]> {
   const samples: GameSample[] = [];
   const priorW = [
-    2.0, 1.1, 1.1, 0.08, 0.6, 1.0, 0.7, 0.8, 0.5, 0.6,
+    2.0, 1.1, 1.1, 0.08, 0.6, 1.0, 1.0, 0.8, 0.5, 0.6,
     0.25, 0.12, 0.35, 0.3, 0.18, 0.65, 1.0, 0.85,
     0.5, // sentiment diff
   ];
+
+  // If we have historical samples (real game outcomes), seed the training corpus with them.
+  if (historicalSamples && historicalSamples.length > 0) {
+    samples.push(...historicalSamples);
+  }
+
+  // Build samples from synthetic season logs
+  function addSample(a: Team, b: Team, label: number) {
+    const features = computeFeatures(a, b, sentiment);
+    samples.push({ features, label });
+  }
 
   function synOpp(q: 1 | 2 | 3 | 4): Team {
     const baseOE = [122, 116, 110, 104][q - 1] + (rand() - 0.5) * 6;
@@ -194,19 +209,15 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
   teams.forEach(team => {
     const nr = team.netRanking;
     const dist: [number, number, number, number] =
-      nr <= 15 ? [14,8,6,4] : nr <= 35 ? [11,9,7,5] : nr <= 65 ? [8,9,9,6] : [4,7,11,10];
+      nr <= 15 ? [14, 8, 6, 4] : nr <= 35 ? [11, 9, 7, 5] : nr <= 65 ? [8, 9, 9, 6] : [4, 7, 11, 10];
 
     for (let q = 0; q < 4; q++) {
       const band = (q + 1) as 1 | 2 | 3 | 4;
       for (let g = 0; g < dist[q]; g++) {
         const opp = synOpp(band);
-        const features = computeFeatures(team, opp);
-        const sentimentDiff = (rand() - 0.5) * 0.4;
-        const featuresWithSentiment = [...features, sentimentDiff];
-        const z = featuresWithSentiment.reduce((s, f, i) => s + priorW[i] * f, 0);
-        const prob = sigmoid(z);
-        const noisy = Math.max(0.04, Math.min(0.96, prob + (rand() - 0.5) * 0.22));
-        samples.push({ features: featuresWithSentiment, label: rand() < noisy ? 1 : 0 });
+        const prob = 1 / (1 + Math.exp(-(team.netRanking - opp.netRanking) / 20));
+        const label = rand() < prob ? 1 : 0;
+        addSample(team, opp, label);
       }
     }
 
@@ -215,13 +226,9 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
     const numH2H = Math.min(6, peers.length);
     for (let i = 0; i < numH2H; i++) {
       const opp = peers[Math.floor(rand() * peers.length)];
-      const features = computeFeatures(team, opp);
-      const sentimentDiff = (rand() - 0.5) * 0.4;
-      const featuresWithSentiment = [...features, sentimentDiff];
-      const z = featuresWithSentiment.reduce((s, f, i) => s + priorW[i] * f, 0);
-      const prob = sigmoid(z);
-      const noisy = Math.max(0.05, Math.min(0.95, prob + (rand() - 0.5) * 0.18));
-      samples.push({ features: featuresWithSentiment, label: rand() < noisy ? 1 : 0 });
+      const prob = 1 / (1 + Math.exp(-(team.netRanking - opp.netRanking) / 20));
+      const label = rand() < prob ? 1 : 0;
+      addSample(team, opp, label);
     }
   });
 
