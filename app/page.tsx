@@ -3,15 +3,14 @@
 import { useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { SimProgress, ModelStats, Team } from '@/lib/types';
-import type { DisplayBracket, ConsensusData, EnsembleModel } from '@/lib/simulation';
+import type { DisplayBracket, EnsembleModel } from '@/lib/simulation';
 import ProgressBar from '@/components/ProgressBar';
 
 const BracketDisplay = dynamic(() => import('@/components/BracketDisplay'), { ssr: false });
 const InfoModal      = dynamic(() => import('@/components/InfoModal'),      { ssr: false });
 const TeamStatsPanel = dynamic(() => import('@/components/TeamStatsPanel'), { ssr: false });
 
-const DEFAULT_N = 10;
-type Mode = 'single' | 'consensus';
+const DEFAULT_EPOCHS = 1000;
 
 // Minimum ms to show a phase in the progress bar (visual feedback)
 async function showPhase(ms: number) {
@@ -19,8 +18,7 @@ async function showPhase(ms: number) {
 }
 
 export default function Home() {
-  const [mode, setMode]               = useState<Mode>('single');
-  const [simN, setSimN]               = useState(DEFAULT_N);
+  const [nnEpochs, setNnEpochs]       = useState(DEFAULT_EPOCHS);
   const [running, setRunning]         = useState(false);
   const [showInfo, setShowInfo]       = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -30,7 +28,6 @@ export default function Home() {
     detail: '',
   });
   const [bracket, setBracket]         = useState<DisplayBracket | null>(null);
-  const [consensus, setConsensus]     = useState<ConsensusData | null>(null);
   const [champion, setChampion]       = useState<Team | null>(null);
   const [modelStats, setModelStats]   = useState<ModelStats | null>(null);
   const [fetchedTeams, setFetchedTeams] = useState(0);
@@ -40,13 +37,13 @@ export default function Home() {
     if (running) return;
     setRunning(true);
     abortRef.current = { aborted: false };
-    setBracket(null); setConsensus(null); setChampion(null); setSelectedTeam(null);
+    setBracket(null); setChampion(null); setSelectedTeam(null);
 
     try {
       const { buildRegionTeams } = await import('@/lib/bracket');
       const {
         generateTrainingSamples, trainLogisticRegression, computeModelStats,
-        simulateBracket, runConsensusAnalysis, buildDisplayBracket,
+        simulateBracket, buildDisplayBracket,
         buildEloRatings,
       } = await import('@/lib/simulation');
       const { trainDeepNN } = await import('@/lib/neuralNet');
@@ -156,7 +153,7 @@ export default function Home() {
           detail: `Loss: ${loss.toFixed(5)}  Acc: ${(acc * 100).toFixed(1)}%  LR: ${lr.toFixed(5)}`,
           training: { epoch, totalEpochs, loss, accuracy: acc, lrDecay: lr, modelType: 'neural' },
         });
-      });
+      }, nnEpochs);
 
       // ── Phase 5: Calibrate Elo ────────────────────────────────────────
       setProgress({
@@ -191,12 +188,10 @@ export default function Home() {
       });
       await showPhase(200);
 
-      // ── Phase 6: Simulate ─────────────────────────────────────────────
-      if (mode === 'single') {
         setProgress({
           phase: 'simulating', phaseProgress: 0, overall: 0.66,
           message: 'SIMULATING TOURNAMENT BRACKET',
-          detail: 'Sampling 63 games from ensemble probability distribution',
+          detail: 'Evaluating 63 games deterministically from ensemble probability distribution',
         });
         await showPhase(300);
 
@@ -223,7 +218,7 @@ export default function Home() {
         });
         await showPhase(200);
 
-        const display = buildDisplayBracket(regionTeams, model, simResult, null);
+        const display = buildDisplayBracket(regionTeams, model, simResult);
         setBracket(display);
         setChampion(simResult.champion);
 
@@ -232,61 +227,6 @@ export default function Home() {
           message: 'BRACKET GENERATED',
           detail: `Predicted champion: ${simResult.champion.name} (#${simResult.champion.seed} seed, ${simResult.champion.region})`,
         });
-
-      } else {
-        setProgress({
-          phase: 'simulating', phaseProgress: 0, overall: 0.66,
-          message: `RUNNING ${simN.toLocaleString()} MONTE CARLO SIMULATIONS`,
-          detail: 'Each simulation independently samples all 63 games from ensemble probabilities',
-        });
-        await showPhase(150);
-
-        const consensusData = await runConsensusAnalysis(
-          regionTeams, model, simN,
-          (done, total) => {
-            const frac = done / total;
-            setProgress({
-              phase: 'simulating',
-              phaseProgress: frac,
-              overall: 0.66 + frac * 0.26,
-              message: `MONTE CARLO — ${done.toLocaleString()} / ${total.toLocaleString()} SIMULATIONS`,
-              detail: `${(frac * 100).toFixed(1)}% complete · ${(done * 63).toLocaleString()} total games simulated`,
-            });
-          },
-          abortRef.current,
-        );
-
-        setProgress({
-          phase: 'analyzing', phaseProgress: 0, overall: 0.93,
-          message: 'AGGREGATING CHAMPION / F4 / E8 / S16 FREQUENCIES',
-          detail: `Computing consensus bracket from ${consensusData.totalSims.toLocaleString()} simulations`,
-        });
-        await showPhase(200);
-
-        setProgress({
-          phase: 'analyzing', phaseProgress: 0.5, overall: 0.96,
-          message: 'COMPUTING STATISTICAL CONFIDENCE INTERVALS',
-          detail: 'Wilson CIs · Brier score · ECE · expected wins per team',
-        });
-        await showPhase(250);
-
-        const simResult = consensusData.mostLikelyBracket;
-        const display   = buildDisplayBracket(regionTeams, model, simResult, consensusData);
-
-        let bestId = ''; let bestCnt = 0;
-        consensusData.championFreq.forEach((cnt, id) => { if (cnt > bestCnt) { bestCnt = cnt; bestId = id; } });
-        const bestChamp = allTeams.find(t => t.id === bestId) ?? simResult.champion;
-
-        setBracket(display);
-        setConsensus(consensusData);
-        setChampion(bestChamp);
-
-        setProgress({
-          phase: 'done', phaseProgress: 1, overall: 1,
-          message: `CONSENSUS COMPLETE — ${consensusData.totalSims.toLocaleString()} SIMULATIONS`,
-          detail: `Champion: ${bestChamp.name} — ${((bestCnt / consensusData.totalSims) * 100).toFixed(1)}% of simulations`,
-        });
-      }
 
     } catch (err) {
       console.error(err);
@@ -298,7 +238,7 @@ export default function Home() {
     } finally {
       setRunning(false);
     }
-  }, [running, mode, simN]);
+  }, [running, nnEpochs]);
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -340,51 +280,37 @@ export default function Home() {
       {/* ── Controls ── */}
       <div style={{ borderBottom: '1px solid #0d1e30', background: '#030b18' }}>
         <div className="max-w-screen-2xl mx-auto px-6 py-3 flex flex-wrap items-center gap-3">
-          {/* Mode buttons */}
-          <div style={{ display: 'flex', border: '1px solid #1e3a5f' }}>
-            <ModeBtn
-              active={mode === 'single'} disabled={running}
-              onClick={() => setMode('single')}
-              label="GENERATE BRACKET" sub="1 SIMULATION"
-            />
-            <div style={{ width: 1, background: '#1e3a5f' }} />
-            <ModeBtn
-              active={mode === 'consensus'} disabled={running}
-              onClick={() => setMode('consensus')}
-              label="CONSENSUS ANALYSIS" sub={`${simN.toLocaleString()} SIMULATIONS`}
+          {/* Neural Net Epochs Input */}
+          <div
+            className="flex items-center px-3 py-1.5"
+            style={{ border: '1px solid #1e3a5f', background: '#030b18' }}
+          >
+            <span className="text-[10px] tracking-[0.1em] text-slate-400 uppercase mr-3">NN Epochs</span>
+            <input
+              type="number"
+              min={1}
+              max={20000}
+              value={nnEpochs}
+              onChange={e => {
+                let v = parseInt(e.target.value, 10);
+                if (isNaN(v)) v = 1000;
+                v = Math.max(1, Math.min(20000, v));
+                setNnEpochs(v);
+              }}
+              disabled={running}
+              style={{
+                width: '74px',
+                background: 'transparent',
+                border: '1px solid #1e3a5f',
+                color: '#f59e0b',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                fontWeight: 900,
+                padding: '4px 8px',
+                textAlign: 'center',
+              }}
             />
           </div>
-
-          {/* Sim-count preset chips */}
-          {mode === 'consensus' && (
-            <div
-              className="flex items-center gap-1 px-2 py-1"
-              style={{ border: '1px solid #1e3a5f', background: '#030b18' }}
-            >
-              <span className="text-[9px] tracking-[0.2em] text-slate-600 uppercase mr-1">SIMS</span>
-              {[10, 100, 500, 1000, 5000].map(n => (
-                <button
-                  key={n}
-                  onClick={() => setSimN(n)}
-                  disabled={running}
-                  style={{
-                    padding: '4px 10px',
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: simN === n ? 900 : 400,
-                    letterSpacing: '0.05em',
-                    background: simN === n ? '#f59e0b22' : 'transparent',
-                    color: simN === n ? '#f59e0b' : '#334155',
-                    border: simN === n ? '1px solid #f59e0b66' : '1px solid transparent',
-                    cursor: running ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.1s',
-                  }}
-                >
-                  {n >= 1000 ? `${n / 1000}k` : n}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Generate button */}
           <button
@@ -409,7 +335,7 @@ export default function Home() {
                 <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>◈</span>
                 ANALYZING…
               </span>
-            ) : mode === 'single' ? 'GENERATE' : `RUN ${simN.toLocaleString()}`}
+            ) : 'GENERATE BRACKET'}
           </button>
 
           {running && fetchedTeams > 0 && (
@@ -435,17 +361,12 @@ export default function Home() {
           <div className="max-w-screen-2xl mx-auto flex items-center gap-4">
             <div style={{ width: 3, height: 28, background: '#f59e0b', flexShrink: 0 }} />
             <span className="text-[9px] tracking-[0.3em] uppercase text-amber-700">
-              {mode === 'consensus' ? 'CONSENSUS CHAMPION' : 'PREDICTED CHAMPION'}
+              PREDICTED CHAMPION
             </span>
             <span className="text-base font-black tracking-wide" style={{ color: '#fbbf24' }}>
               #{champion.seed} {champion.name.toUpperCase()}
             </span>
             <span className="text-xs text-amber-800">{champion.region}</span>
-            {mode === 'consensus' && consensus && (
-              <span className="text-sm font-bold tabular-nums" style={{ color: '#f59e0b' }}>
-                {(((consensus.championFreq.get(champion.id) ?? 0) / consensus.totalSims) * 100).toFixed(1)}% OF SIMS
-              </span>
-            )}
             {champion.roster && champion.roster.length > 0 && (
               <span className="text-[10px] text-slate-700">
                 {champion.roster.slice(0, 3).map(p => p.name.split(' ').pop()).join(' · ')}
@@ -481,7 +402,7 @@ export default function Home() {
             >
               ▸ MODEL DETAILS — FEATURE IMPORTANCE · ENSEMBLE WEIGHTS · TRAINING METRICS
             </summary>
-            <ModelStatsPanel stats={modelStats} consensus={consensus} />
+            <ModelStatsPanel stats={modelStats} />
           </details>
         </div>
       )}
@@ -489,10 +410,9 @@ export default function Home() {
       {/* ── Bracket ── */}
       {bracket && !running && (
         <section className="flex-1 px-2 py-4">
-          <LegendBar mode={mode} />
+          <LegendBar />
           <BracketDisplay
             bracket={bracket}
-            consensus={consensus}
             champion={champion}
             onTeamClick={setSelectedTeam}
           />
@@ -517,7 +437,6 @@ export default function Home() {
       <TeamStatsPanel
         team={selectedTeam}
         onClose={() => setSelectedTeam(null)}
-        consensus={consensus}
       />
     </main>
   );
@@ -569,7 +488,7 @@ function ModelBadge({ stats }: { stats: ModelStats }) {
   );
 }
 
-function ModelStatsPanel({ stats, consensus }: { stats: ModelStats; consensus: ConsensusData | null }) {
+function ModelStatsPanel({ stats }: { stats: ModelStats }) {
   return (
     <div className="pb-4" style={{ borderTop: '1px solid #0a1628' }}>
       <div className="grid grid-cols-2 gap-4 pt-3">
@@ -597,16 +516,12 @@ function ModelStatsPanel({ stats, consensus }: { stats: ModelStats; consensus: C
           </div>
         </div>
 
-        {/* Consensus / Ensemble */}
+        {/* Ensemble */}
         <div>
           <div className="text-[9px] tracking-[0.25em] text-slate-700 uppercase mb-2">
-            {consensus ? 'Consensus Final Four Probabilities' : 'Ensemble Architecture'}
+            Ensemble Architecture
           </div>
-          {consensus ? (
-            <TopTeamsList freq={consensus.ffFreq} total={consensus.totalSims} />
-          ) : (
-            <EnsembleChart w={stats.ensembleWeights} />
-          )}
+          <EnsembleChart w={stats.ensembleWeights} />
         </div>
       </div>
     </div>
@@ -658,7 +573,7 @@ function EnsembleChart({ w }: { w: { lr: number; nn: number; elo: number; em: nu
   );
 }
 
-function LegendBar({ mode }: { mode: Mode }) {
+function LegendBar() {
   return (
     <div className="px-4 mb-2 flex items-center gap-4" style={{ fontFamily: 'monospace' }}>
       {[
@@ -673,7 +588,7 @@ function LegendBar({ mode }: { mode: Mode }) {
         </div>
       ))}
       <span className="text-[9px] text-slate-700 uppercase tracking-widest">
-        {mode === 'consensus' ? '% = consensus simulation frequency' : '% = ensemble win probability'}
+        % = ensemble win probability
       </span>
       <span className="text-[9px] text-slate-700 ml-auto">Click team for full stats · Hover for quick view</span>
     </div>

@@ -3,6 +3,14 @@ import type { DeepNNWeights } from './neuralNet';
 import { nnPredictDeep } from './neuralNet';
 import { playerWinProbAdjustment } from './playerSim';
 
+// ── Randomness ─────────────────────────────────────────────────────────────
+export let globalSeed = 2026;
+export function setSeed(s: number) { globalSeed = s; }
+export function rand(): number {
+  globalSeed = (globalSeed * 1664525 + 1013904223) | 0;
+  return (globalSeed >>> 0) / 4294967296;
+}
+
 // ─── Feature names ─────────────────────────────────────────────────────────
 
 export const FEATURE_NAMES = [
@@ -136,25 +144,25 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
   const priorW = [2.0, 1.1, 1.1, 0.08, 0.6, 1.0, 0.7, 0.8, 0.5, 0.6, 0.25, 0.12, 0.35, 0.3, 0.18, 0.65, 1.0, 0.85];
 
   function synOpp(q: 1 | 2 | 3 | 4): Team {
-    const baseOE = [122, 116, 110, 104][q - 1] + (Math.random() - 0.5) * 6;
-    const baseDE = [93, 101, 107, 114][q - 1] + (Math.random() - 0.5) * 6;
+    const baseOE = [122, 116, 110, 104][q - 1] + (rand() - 0.5) * 6;
+    const baseDE = [93, 101, 107, 114][q - 1] + (rand() - 0.5) * 6;
     return {
       id: 'opp', name: 'Opp', seed: 0, region: 'East', espnId: 0,
-      adjOE: baseOE, adjDE: baseDE, adjTempo: 67 + (Math.random() - 0.5) * 8,
-      wins: 18 + Math.floor(Math.random() * 8), losses: 5 + Math.floor(Math.random() * 10),
+      adjOE: baseOE, adjDE: baseDE, adjTempo: 67 + (rand() - 0.5) * 8,
+      wins: 18 + Math.floor(rand() * 8), losses: 5 + Math.floor(rand() * 10),
       q1W: [6,3,1,0][q-1], q1L: [6,4,2,1][q-1],
       q2W: 5, q2L: 3, q3W: 6, q3L: 1, q4W: 4, q4L: 0,
-      netRanking: [20,55,115,200][q-1] + (Math.random() - 0.5) * 25,
+      netRanking: [20,55,115,200][q-1] + (rand() - 0.5) * 25,
       sos: [25,55,110,185][q-1],
-      last10: 6 + Math.floor(Math.random() * 4),
-      efgPct: 51 + (Math.random() - 0.5) * 5,
-      toRate: 16 + (Math.random() - 0.5) * 4,
-      orbPct: 28 + (Math.random() - 0.5) * 6,
-      ftRate: 35 + (Math.random() - 0.5) * 6,
+      last10: 6 + Math.floor(rand() * 4),
+      efgPct: 51 + (rand() - 0.5) * 5,
+      toRate: 16 + (rand() - 0.5) * 4,
+      orbPct: 28 + (rand() - 0.5) * 6,
+      ftRate: 35 + (rand() - 0.5) * 6,
       defEfgPct: 52, defToRate: 17, defOrbPct: 28, defFtRate: 33,
       threePtRate: 38, threePtPct: 35,
-      experience: 0.4 + Math.random() * 0.3,
-      coachTourneyWins: Math.floor(Math.random() * 20),
+      experience: 0.4 + rand() * 0.3,
+      coachTourneyWins: Math.floor(rand() * 20),
     };
   }
 
@@ -170,8 +178,8 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
         const features = computeFeatures(team, opp);
         const z = features.reduce((s, f, i) => s + priorW[i] * f, 0);
         const prob = sigmoid(z);
-        const noisy = Math.max(0.04, Math.min(0.96, prob + (Math.random() - 0.5) * 0.22));
-        samples.push({ features, label: Math.random() < noisy ? 1 : 0 });
+        const noisy = Math.max(0.04, Math.min(0.96, prob + (rand() - 0.5) * 0.22));
+        samples.push({ features, label: rand() < noisy ? 1 : 0 });
       }
     }
 
@@ -179,18 +187,18 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
     const peers = teams.filter(t => t.id !== team.id && Math.abs(t.netRanking - team.netRanking) < 22);
     const numH2H = Math.min(6, peers.length);
     for (let i = 0; i < numH2H; i++) {
-      const opp = peers[Math.floor(Math.random() * peers.length)];
+      const opp = peers[Math.floor(rand() * peers.length)];
       const features = computeFeatures(team, opp);
       const z = features.reduce((s, f, i) => s + priorW[i] * f, 0);
       const prob = sigmoid(z);
-      const noisy = Math.max(0.05, Math.min(0.95, prob + (Math.random() - 0.5) * 0.18));
-      samples.push({ features, label: Math.random() < noisy ? 1 : 0 });
+      const noisy = Math.max(0.05, Math.min(0.95, prob + (rand() - 0.5) * 0.18));
+      samples.push({ features, label: rand() < noisy ? 1 : 0 });
     }
   });
 
   // Shuffle
   for (let i = samples.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [samples[i], samples[j]] = [samples[j], samples[i]];
   }
   return samples;
@@ -208,14 +216,14 @@ export async function trainLogisticRegression(
   const BATCH = 64;
   const n = samples.length;
 
-  const weights = Array.from({ length: NUM_FEATURES }, () => (Math.random() - 0.5) * 0.05);
+  const weights = Array.from({ length: NUM_FEATURES }, () => (rand() - 0.5) * 0.05);
   const m = new Array(NUM_FEATURES).fill(0);
   const v = new Array(NUM_FEATURES).fill(0);
   let t = 0;
 
   for (let epoch = 0; epoch < EPOCHS; epoch++) {
     for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rand() * (i + 1));
       [samples[i], samples[j]] = [samples[j], samples[i]];
     }
 
@@ -320,7 +328,7 @@ export function simulateBracket(
         if (abortSignal?.aborted) return { regionRounds, finalFour: [], ffWinners: [], champion: pool[0], allRoundWinners, winProbs };
         const a = pool[i], b = pool[i + 1];
         const prob = ensembleWinProb(model, a, b);
-        const winner = Math.random() < prob ? a : b;
+        const winner = prob >= 0.5 ? a : b;
         const key = `r${r}_rd${round}_g${i / 2}`;
         allRoundWinners.set(key, winner);
         winProbs.set(key, winner === a ? prob : 1 - prob);
@@ -335,11 +343,11 @@ export function simulateBracket(
   // Final Four: East vs South, Midwest vs West
   const ff0Prob = ensembleWinProb(model, finalFour[0], finalFour[1]);
   const ff1Prob = ensembleWinProb(model, finalFour[2], finalFour[3]);
-  const ff0 = Math.random() < ff0Prob ? finalFour[0] : finalFour[1];
-  const ff1 = Math.random() < ff1Prob ? finalFour[2] : finalFour[3];
+  const ff0 = ff0Prob >= 0.5 ? finalFour[0] : finalFour[1];
+  const ff1 = ff1Prob >= 0.5 ? finalFour[2] : finalFour[3];
 
   const champProb = ensembleWinProb(model, ff0, ff1);
-  const champ = Math.random() < champProb ? ff0 : ff1;
+  const champ = champProb >= 0.5 ? ff0 : ff1;
 
   return {
     regionRounds,
@@ -351,89 +359,6 @@ export function simulateBracket(
   };
 }
 
-// ─── Consensus analysis ────────────────────────────────────────────────────
-
-export interface ConsensusData {
-  championFreq: Map<string, number>;
-  ffFreq: Map<string, number>;
-  e8Freq: Map<string, number>;
-  s16Freq: Map<string, number>;
-  gameSlotFreq: Map<string, Map<string, number>>;
-  totalSims: number;
-  mostLikelyBracket: BracketSimOutput;
-}
-
-export async function runConsensusAnalysis(
-  regionTeams: Team[][],
-  model: EnsembleModel,
-  numSims: number,
-  onProgress: (done: number, total: number) => void,
-  abortSignal?: { aborted: boolean },
-): Promise<ConsensusData> {
-  const championFreq = new Map<string, number>();
-  const ffFreq       = new Map<string, number>();
-  const e8Freq       = new Map<string, number>();
-  const s16Freq      = new Map<string, number>();
-  const gameSlotFreq = new Map<string, Map<string, number>>();
-
-  // Track per-slot winner counts for most-likely bracket
-  const slotWinnerCounts = new Map<string, Map<string, number>>();
-
-  const BATCH = 150;
-  let done = 0;
-
-  while (done < numSims) {
-    if (abortSignal?.aborted) break;
-    const batch = Math.min(BATCH, numSims - done);
-    for (let i = 0; i < batch; i++) {
-      const r = simulateBracket(regionTeams, model);
-
-      // Champion
-      const cid = r.champion.id;
-      championFreq.set(cid, (championFreq.get(cid) ?? 0) + 1);
-
-      // Final Four
-      r.finalFour.forEach(t => ffFreq.set(t.id, (ffFreq.get(t.id) ?? 0) + 1));
-
-      // Elite Eight (round index 2 = Sweet 16 winners = E8 participants)
-      r.regionRounds.forEach(reg => {
-        if (reg[2]) reg[2].forEach(t => e8Freq.set(t.id, (e8Freq.get(t.id) ?? 0) + 1));
-        if (reg[1]) reg[1].forEach(t => s16Freq.set(t.id, (s16Freq.get(t.id) ?? 0) + 1));
-      });
-
-      // Game slot tracking
-      r.allRoundWinners.forEach((winner, key) => {
-        if (!gameSlotFreq.has(key)) gameSlotFreq.set(key, new Map());
-        if (!slotWinnerCounts.has(key)) slotWinnerCounts.set(key, new Map());
-        const slot = gameSlotFreq.get(key)!;
-        slot.set(winner.id, (slot.get(winner.id) ?? 0) + 1);
-      });
-    }
-
-    done += batch;
-    onProgress(done, numSims);
-    await new Promise(r => setTimeout(r, 0));
-  }
-
-  // Build most-likely bracket by picking argmax winner at each slot
-  // Use sharpened model (5x weights) to deterministically pick winners
-  const sharpModel: EnsembleModel = {
-    ...model,
-    lrWeights: model.lrWeights.map(w => w * 6),
-    ensembleW: { lr: 0.5, nn: 0.3, elo: 0.15, em: 0.05 },
-  };
-  const mostLikelyBracket = simulateBracket(regionTeams, sharpModel);
-
-  return {
-    championFreq,
-    ffFreq,
-    e8Freq,
-    s16Freq,
-    gameSlotFreq,
-    totalSims: done,
-    mostLikelyBracket,
-  };
-}
 
 // ─── Display bracket builder ───────────────────────────────────────────────
 
@@ -465,7 +390,6 @@ function buildRegionGames(
   model: EnsembleModel,
   simResult: BracketSimOutput,
   regionIdx: number,
-  consensus: ConsensusData | null,
 ): DisplayGame[][] {
   const rounds: DisplayGame[][] = [];
   let pool = [...regionTeams];
@@ -489,13 +413,9 @@ function buildRegionGames(
       const key = `r${regionIdx}_rd${rd}_g${i / 2}`;
       const winner = simResult.allRoundWinners.get(key) ?? null;
       const prob = ensembleWinProb(model, a, b);
-      const slot = consensus?.gameSlotFreq.get(key);
-      const total = consensus?.totalSims ?? 1;
       games.push({
         id: key, teamA: a, teamB: b, winner, winProbA: prob,
         round: rd + 1, region: regionName, position: i / 2,
-        teamAConsensus: slot ? ((slot.get(a.id) ?? 0) / total) * 100 : undefined,
-        teamBConsensus: slot ? ((slot.get(b.id) ?? 0) / total) * 100 : undefined,
       });
     }
     rounds.push(games);
@@ -507,11 +427,10 @@ export function buildDisplayBracket(
   regionTeams: Team[][],
   model: EnsembleModel,
   simResult: BracketSimOutput,
-  consensus: ConsensusData | null,
 ): DisplayBracket {
   const names = ['East', 'South', 'Midwest', 'West'];
   const [east, south, midwest, west] = names.map((name, idx) =>
-    buildRegionGames(regionTeams[idx], name, model, simResult, idx, consensus)
+    buildRegionGames(regionTeams[idx], name, model, simResult, idx)
   );
 
   const [ff0a, ff0b, ff1a, ff1b] = [
@@ -519,12 +438,7 @@ export function buildDisplayBracket(
     simResult.finalFour[2], simResult.finalFour[3],
   ];
 
-  function ffConsensus(t: Team) {
-    return consensus ? ((consensus.ffFreq.get(t.id) ?? 0) / consensus.totalSims) * 100 : undefined;
-  }
-  function champConsensus(t: Team) {
-    return consensus ? ((consensus.championFreq.get(t.id) ?? 0) / consensus.totalSims) * 100 : undefined;
-  }
+
 
   const champA = simResult.ffWinners[0];
   const champB = simResult.ffWinners[1];
@@ -535,18 +449,15 @@ export function buildDisplayBracket(
       {
         id: 'ff_0', teamA: ff0a, teamB: ff0b, winner: simResult.ffWinners[0],
         winProbA: ensembleWinProb(model, ff0a, ff0b), round: 5, region: 'Final Four', position: 0,
-        teamAConsensus: ffConsensus(ff0a), teamBConsensus: ffConsensus(ff0b),
       },
       {
         id: 'ff_1', teamA: ff1a, teamB: ff1b, winner: simResult.ffWinners[1],
         winProbA: ensembleWinProb(model, ff1a, ff1b), round: 5, region: 'Final Four', position: 1,
-        teamAConsensus: ffConsensus(ff1a), teamBConsensus: ffConsensus(ff1b),
       },
     ],
     championship: {
       id: 'champ', teamA: champA, teamB: champB, winner: simResult.champion,
       winProbA: ensembleWinProb(model, champA, champB), round: 6, region: 'Championship', position: 0,
-      teamAConsensus: champConsensus(champA), teamBConsensus: champConsensus(champB),
     },
   };
 }

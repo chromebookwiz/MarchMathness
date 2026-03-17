@@ -1,14 +1,11 @@
 import React from 'react';
 import type { Team } from '@/lib/types';
-import type { ConsensusData } from '@/lib/simulation';
-
 interface TeamStatsPanelProps {
   team: Team | null;
   onClose: () => void;
-  consensus: ConsensusData | null;
 }
 
-const TeamStatsPanel: React.FC<TeamStatsPanelProps> = ({ team, onClose, consensus }) => {
+const TeamStatsPanel: React.FC<TeamStatsPanelProps> = ({ team, onClose }) => {
   if (!team) return null;
 
   return (
@@ -41,12 +38,7 @@ const TeamStatsPanel: React.FC<TeamStatsPanelProps> = ({ team, onClose, consensu
             )}
           </ul>
         </div>
-        {consensus && (
-          <div className="mt-4 text-xs text-gray-700">
-            <div>Consensus Final Four Frequency: {((consensus.ffFreq.get(team.id) ?? 0) / consensus.totalSims * 100).toFixed(1)}%</div>
-            <div>Consensus Champion Frequency: {((consensus.championFreq.get(team.id) ?? 0) / consensus.totalSims * 100).toFixed(1)}%</div>
-          </div>
-        )}
+
       </div>
     </div>
   );

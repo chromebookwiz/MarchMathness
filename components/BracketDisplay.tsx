@@ -3,17 +3,15 @@
 import { SLOT_H, ROUND_W, REGION_H, gameTopPx, seedColor, winProbColor } from '@/lib/bracket';
 import type { DisplayBracket, DisplayGame } from '@/lib/simulation';
 import type { Team, Player } from '@/lib/types';
-import type { ConsensusData } from '@/lib/simulation';
 import { useState } from 'react';
 
 interface Props {
   bracket: DisplayBracket;
-  consensus: ConsensusData | null;
   champion: Team | null;
   onTeamClick?: (team: Team) => void;
 }
 
-export default function BracketDisplay({ bracket, consensus, champion, onTeamClick }: Props) {
+export default function BracketDisplay({ bracket, champion, onTeamClick }: Props) {
   const [hoveredTeam, setHoveredTeam] = useState<Team | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -43,7 +41,6 @@ export default function BracketDisplay({ bracket, consensus, champion, onTeamCli
         {/* CENTER */}
         <CenterColumn
           bracket={bracket}
-          consensus={consensus}
           champion={champion}
           onHover={setHoveredTeam}
           setPos={setTooltipPos}
@@ -154,7 +151,6 @@ function GameCard({
         team={teamA}
         isWinner={game.winner?.id === teamA.id}
         prob={game.winProbA}
-        consensus={game.teamAConsensus}
         onHover={onHover}
         setPos={setPos}
         onClick={onClick}
@@ -164,7 +160,6 @@ function GameCard({
         team={teamB}
         isWinner={game.winner?.id === teamB.id}
         prob={1 - game.winProbA}
-        consensus={game.teamBConsensus}
         onHover={onHover}
         setPos={setPos}
         onClick={onClick}
@@ -174,20 +169,17 @@ function GameCard({
 }
 
 function TeamRow({
-  team, isWinner, prob, consensus, onHover, setPos, onClick,
+  team, isWinner, prob, onHover, setPos, onClick,
 }: {
   team: Team;
   isWinner: boolean;
   prob: number;
-  consensus?: number;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
   onClick?: (t: Team) => void;
 }) {
   const barColor = winProbColor(prob);
-  const pctDisplay = consensus !== undefined
-    ? `${consensus.toFixed(0)}%`
-    : `${Math.round(prob * 100)}%`;
+  const pctDisplay = `${Math.round(prob * 100)}%`;
 
   return (
     <div
@@ -239,7 +231,7 @@ function TeamRow({
       {/* Pct */}
       <span
         className="flex-shrink-0 pr-1 tabular-nums font-bold"
-        style={{ fontSize: 9, color: consensus !== undefined ? '#f59e0b' : barColor }}
+        style={{ fontSize: 9, color: barColor }}
       >
         {pctDisplay}
       </span>
@@ -248,10 +240,9 @@ function TeamRow({
 }
 
 function CenterColumn({
-  bracket, consensus, champion, onHover, setPos, onClick,
+  bracket, champion, onHover, setPos, onClick,
 }: {
   bracket: DisplayBracket;
-  consensus: ConsensusData | null;
   champion: Team | null;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
@@ -274,7 +265,7 @@ function CenterColumn({
       <FFGameBlock game={bracket.finalFour[0]} label="EAST · SOUTH" onHover={onHover} setPos={setPos} onClick={onClick} />
 
       <div className="my-3 w-full">
-        <ChampBlock game={bracket.championship} champion={champion} consensus={consensus} onHover={onHover} setPos={setPos} onClick={onClick} />
+        <ChampBlock game={bracket.championship} champion={champion} onHover={onHover} setPos={setPos} onClick={onClick} />
       </div>
 
       <FFGameBlock game={bracket.finalFour[1]} label="MIDWEST · WEST" onHover={onHover} setPos={setPos} onClick={onClick} />
@@ -299,13 +290,13 @@ function FFGameBlock({
       <div style={{ border: '1px solid #1e3a5f', background: '#050e1c' }}>
         <FFRow
           team={teamA} isWinner={winner?.id === teamA.id}
-          prob={game.winProbA} consensus={game.teamAConsensus}
+          prob={game.winProbA}
           onHover={onHover} setPos={setPos} onClick={onClick}
         />
         <div style={{ height: 1, background: '#1e3a5f' }} />
         <FFRow
           team={teamB} isWinner={winner?.id === teamB.id}
-          prob={1 - game.winProbA} consensus={game.teamBConsensus}
+          prob={1 - game.winProbA}
           onHover={onHover} setPos={setPos} onClick={onClick}
         />
       </div>
@@ -314,9 +305,9 @@ function FFGameBlock({
 }
 
 function FFRow({
-  team, isWinner, prob, consensus, onHover, setPos, onClick,
+  team, isWinner, prob, onHover, setPos, onClick,
 }: {
-  team: Team; isWinner: boolean; prob: number; consensus?: number;
+  team: Team; isWinner: boolean; prob: number;
   onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
   onClick?: (t: Team) => void;
 }) {
@@ -344,16 +335,16 @@ function FFRow({
         {team.name}
       </span>
       <span className="text-xs font-bold tabular-nums" style={{ color: winProbColor(prob) }}>
-        {consensus !== undefined ? `${consensus.toFixed(0)}%` : `${Math.round(prob * 100)}%`}
+        {Math.round(prob * 100)}%
       </span>
     </div>
   );
 }
 
 function ChampBlock({
-  game, champion, consensus, onHover, setPos, onClick,
+  game, champion, onHover, setPos, onClick,
 }: {
-  game: DisplayGame; champion: Team | null; consensus: ConsensusData | null;
+  game: DisplayGame; champion: Team | null;
   onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
   onClick?: (t: Team) => void;
 }) {
@@ -381,7 +372,6 @@ function ChampBlock({
             team={t}
             isWinner={winner?.id === t.id}
             prob={t === teamA ? game.winProbA : 1 - game.winProbA}
-            consensus={t === teamA ? game.teamAConsensus : game.teamBConsensus}
             onHover={onHover}
             setPos={setPos}
             onClick={onClick}
@@ -396,11 +386,6 @@ function ChampBlock({
           style={{ background: '#100800', color: '#fbbf24', borderTop: '1px solid #f59e0b44' }}
         >
           CHAMPION: {winner.name}
-          {consensus && (
-            <span className="ml-2 text-amber-600">
-              ({(((consensus.championFreq.get(winner.id) ?? 0) / consensus.totalSims) * 100).toFixed(1)}%)
-            </span>
-          )}
         </div>
       )}
     </div>
@@ -408,9 +393,9 @@ function ChampBlock({
 }
 
 function ChampRow({
-  team, isWinner, prob, consensus, onHover, setPos, onClick,
+  team, isWinner, prob, onHover, setPos, onClick,
 }: {
-  team: Team; isWinner: boolean; prob: number; consensus?: number;
+  team: Team; isWinner: boolean; prob: number;
   onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
   onClick?: (t: Team) => void;
 }) {
@@ -438,7 +423,7 @@ function ChampRow({
         {team.name}
       </span>
       <span className="text-sm font-bold tabular-nums" style={{ color: isWinner ? '#f59e0b' : '#334155' }}>
-        {consensus !== undefined ? `${consensus.toFixed(1)}%` : `${Math.round(prob * 100)}%`}
+        {Math.round(prob * 100)}%
       </span>
     </div>
   );

@@ -10,6 +10,7 @@
  */
 
 import type { NNWeights } from './types';
+import { rand } from './simulation';
 
 export const NN_ARCH = [18, 64, 32, 16, 8, 1] as const;
 const NUM_LAYERS = NN_ARCH.length - 1; // 5 weight matrices
@@ -42,8 +43,8 @@ export function initDeepNN(): DeepNNWeights {
     const w = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       // Box-Muller normal
-      const u1 = 1 - Math.random();
-      const u2 = 1 - Math.random();
+      const u1 = 1 - rand();
+      const u2 = 1 - rand();
       w[i] = scale * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
     }
 
@@ -207,19 +208,20 @@ export function nnBackpropDeep(
 export async function trainDeepNN(
   samples: { features: number[]; label: number }[],
   onProgress: (epoch: number, totalEpochs: number, loss: number, acc: number, lr: number) => void,
+  userEpochs: number = 1000,
 ): Promise<DeepNNWeights> {
   const net   = initDeepNN();
-  const EPOCHS = 1000;
+  const EPOCHS = userEpochs;
   const LR_MAX = 0.005;
   const LR_MIN = 0.0001;
-  const WARMUP = 40;     // linear warmup epochs
+  const WARMUP = Math.min(40, Math.floor(EPOCHS * 0.1));
   const BATCH  = 64;
   const n = samples.length;
 
   for (let epoch = 0; epoch < EPOCHS; epoch++) {
     // Shuffle
     for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rand() * (i + 1));
       [samples[i], samples[j]] = [samples[j], samples[i]];
     }
 
@@ -249,7 +251,8 @@ export async function trainDeepNN(
       }
     }
 
-    if (epoch % 25 === 0 || epoch === EPOCHS - 1) {
+    const reportStep = Math.max(1, Math.floor(EPOCHS / 40));
+    if (epoch % reportStep === 0 || epoch === EPOCHS - 1) {
       onProgress(epoch + 1, EPOCHS, totalLoss / n, correct / n, lr);
       await new Promise(r => setTimeout(r, 0));
     }

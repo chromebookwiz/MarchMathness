@@ -302,35 +302,96 @@ export function simulateFullGame(teamA: Team, teamB: Team): FullGameResult {
 
 // ── Compute player-enhanced win probability adjustment ────────────────────
 
+function parseHeightToInches(ht: string): number {
+  const m = ht.match(/(\d+)'(\d+)/);
+  if (!m) return 75; // 6'3"
+  return parseInt(m[1], 10) * 12 + parseInt(m[2], 10);
+}
+
+function estimateReach(heightInches: number, position: string): number {
+  // Wingspan/reach estimation based on height and position archetype
+  let wingspanBonus = 2; // Guards +2 inches
+  if (position === 'F' || position === 'SF') wingspanBonus = 4;
+  if (position === 'PF') wingspanBonus = 5;
+  if (position === 'C') wingspanBonus = 6;
+  
+  // Standing reach roughly height + wingspanBonus * 0.5 + reach constant
+  return heightInches * 1.33 + wingspanBonus;
+}
+
 export function playerWinProbAdjustment(teamA: Team, teamB: Team): number {
   const rA = teamA.roster ?? [];
   const rB = teamB.roster ?? [];
   if (!rA.length || !rB.length) return 0;
 
-  // Sort by BPM descending
-  const sortA = [...rA].sort((a, b) => b.bpm - a.bpm);
-  const sortB = [...rB].sort((a, b) => b.bpm - a.bpm);
+  // Weight players by minutes played
+  const totalMinA = rA.reduce((s, p) => s + p.mpg, 0) || 1;
+  const totalMinB = rB.reduce((s, p) => s + p.mpg, 0) || 1;
 
-  // Star differential (top player BPM)
+  // 1. Minutes-weighted height & reach
+  let hgtA = 0, reachA = 0;
+  rA.forEach(p => { 
+    const h = parseHeightToInches(p.height);
+    const r = estimateReach(h, p.position);
+    hgtA += h * (p.mpg / totalMinA);
+    reachA += r * (p.mpg / totalMinA);
+  });
+
+  let hgtB = 0, reachB = 0;
+  rB.forEach(p => { 
+    const h = parseHeightToInches(p.height);
+    const r = estimateReach(h, p.position);
+    hgtB += h * (p.mpg / totalMinB);
+    reachB += r * (p.mpg / totalMinB);
+  });
+
+  const heightAdv = (hgtA - hgtB) / 10; // 1 inch = 0.1% win prob
+  const reachAdv  = (reachA - reachB) / 10; 
+
+  // 2. Center Matchup (Top Minute Center/PF)
+  const bigA = rA.filter(p => p.position === 'C' || p.position === 'PF').sort((a,b) => b.mpg - a.mpg)[0];
+  const bigB = rB.filter(p => p.position === 'C' || p.position === 'PF').sort((a,b) => b.mpg - a.mpg)[0];
+  
+  let bigAdv = 0;
+  if (bigA && bigB) {
+    const bigHgtA = parseHeightToInches(bigA.height);
+    const bigHgtB = parseHeightToInches(bigB.height);
+    bigAdv = ((bigHgtA - bigHgtB) + (bigA.bpm - bigB.bpm) * 0.5) * 0.005;
+  }
+
+  // 3. Guard Matchup (Ball Security & Playmaking vs Pressure)
+  const guardsA = rA.filter(p => p.position.includes('G') || p.position === 'PG').sort((a,b) => b.mpg - a.mpg).slice(0, 2);
+  const guardsB = rB.filter(p => p.position.includes('G') || p.position === 'PG').sort((a,b) => b.mpg - a.mpg).slice(0, 2);
+  
+  const astTovA = guardsA.reduce((s, p) => s + p.apg, 0) / Math.max(0.1, guardsA.reduce((s, p) => s + p.topg, 0));
+  const astTovB = guardsB.reduce((s, p) => s + p.apg, 0) / Math.max(0.1, guardsB.reduce((s, p) => s + p.topg, 0));
+  const guardAdv = (astTovA - astTovB) * 0.01;
+
+  // 4. Star Power (Top player BPM weighted by usage and minutes)
+  const sortA = [...rA].sort((a, b) => (b.bpm * b.mpg * b.usageRate) - (a.bpm * a.mpg * a.usageRate));
+  const sortB = [...rB].sort((a, b) => (b.bpm * b.mpg * b.usageRate) - (a.bpm * a.mpg * a.usageRate));
   const starDiff = (sortA[0]?.bpm ?? 0) - (sortB[0]?.bpm ?? 0);
 
-  // Depth (avg BPM of top 8)
-  const avgBPM = (arr: Player[]) =>
-    arr.slice(0, 8).reduce((s, p) => s + p.bpm, 0) / Math.min(arr.length, 8);
-  const depthDiff = avgBPM(sortA) - avgBPM(sortB);
+  // 5. Minutes-weighted Depth and Shooting (TS%)
+  const wtBpmA = rA.slice(0, 8).reduce((s, p) => s + p.bpm * (p.mpg / totalMinA), 0) * 5;
+  const wtBpmB = rB.slice(0, 8).reduce((s, p) => s + p.bpm * (p.mpg / totalMinB), 0) * 5;
+  
+  const wtTsA = rA.reduce((s, p) => s + p.trueShootingPct * (p.mpg / totalMinA), 0);
+  const wtTsB = rB.reduce((s, p) => s + p.trueShootingPct * (p.mpg / totalMinB), 0);
+  
+  const depthDiff = wtBpmA - wtBpmB;
+  const tsDiff = wtTsA - wtTsB;
 
-  // Shooting efficiency diff (TS%)
-  const avgTS = (arr: Player[]) =>
-    arr.slice(0, 8).reduce((s, p) => s + p.trueShootingPct, 0) / Math.min(arr.length, 8);
-  const tsDiff = avgTS(rA) - avgTS(rB);
-
-  // Defensive rating diff (DBPM)
-  const avgDBPM = (arr: Player[]) =>
-    arr.slice(0, 5).reduce((s, p) => s + p.dbpm, 0) / Math.min(arr.length, 5);
-  const defDiff = avgDBPM(rA) - avgDBPM(rB);
-
-  // Composite adjustment — weights tuned to match historical upset rates
-  const adj = starDiff * 0.012 + depthDiff * 0.008 + tsDiff * 0.4 + defDiff * 0.01;
+  // Comprehensive formula integrating height, reach, position matchups, minutes, and stats entirely deterministically
+  const adj = (
+    heightAdv * 0.01 + 
+    reachAdv * 0.015 + 
+    bigAdv + 
+    guardAdv + 
+    starDiff * 0.012 + 
+    depthDiff * 0.008 + 
+    tsDiff * 0.4
+  );
 
   // Cap adjustment at ±0.08 (8 percentage points)
   return Math.max(-0.08, Math.min(0.08, adj));
