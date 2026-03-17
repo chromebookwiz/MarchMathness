@@ -50,6 +50,7 @@ export default function Home() {
       const { trainDeepNN } = await import('@/lib/neuralNet');
       const { fetchAllRosters } = await import('@/lib/espn');
       const { fetchMarketOdds } = await import('@/lib/odds');
+      const { fetchSentimentScores } = await import('@/lib/sentiment');
 
       const regionTeams = buildRegionTeams();
       const allTeams    = regionTeams.flat();
@@ -175,6 +176,7 @@ export default function Home() {
       await showPhase(150);
 
       const marketOdds = await fetchMarketOdds(allTeams);
+      const sentiment = await fetchSentimentScores(allTeams);
 
       const stats = computeModelStats(lrWeights, samples, lrFinalLoss, lrFinalAcc, nnFinalAcc);
       setModelStats(stats);
@@ -184,6 +186,7 @@ export default function Home() {
         nnWeights,
         elos,
         marketOdds,
+        sentiment,
         ensembleW: { lr: 0.35, nn: 0.35, elo: 0.20, em: 0.10, market: 0.10 },
       };
 

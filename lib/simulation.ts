@@ -32,9 +32,10 @@ export const FEATURE_NAMES = [
   'Defensive Score',
   'Raw Scoring Margin',
   'Q1+Q2 Win Rate',
+  'News Sentiment Diff',
 ];
 
-export const NUM_FEATURES = FEATURE_NAMES.length; // 18
+export const NUM_FEATURES = FEATURE_NAMES.length; // 19
 
 // ─── Feature engineering ───────────────────────────────────────────────────
 
@@ -45,9 +46,11 @@ function defScore(t: Team) {
   return (110 - t.adjDE) * 0.4 + t.defToRate * 0.35 + (100 - t.defEfgPct) * 0.5;
 }
 
-export function computeFeatures(a: Team, b: Team): number[] {
+export function computeFeatures(a: Team, b: Team, sentiment?: Map<string, number>): number[] {
   const aEM = a.adjOE - a.adjDE;
   const bEM = b.adjOE - b.adjDE;
+  const aSent = sentiment?.get(a.id) ?? 0;
+  const bSent = sentiment?.get(b.id) ?? 0;
   return [
     (aEM - bEM) * 0.08,
     (a.adjOE - b.adjOE) * 0.04,
@@ -67,6 +70,7 @@ export function computeFeatures(a: Team, b: Team): number[] {
     (defScore(a) - defScore(b)) * 0.03,
     ((aEM - bEM) / 30),
     q12r(a) - q12r(b),
+    (aSent - bSent) * 0.5,
   ];
 }
 
@@ -105,6 +109,7 @@ export interface EnsembleModel {
   nnWeights: DeepNNWeights;
   elos: Map<string, number>;
   marketOdds?: Map<string, number>;
+  sentiment?: Map<string, number>;
   ensembleW: { lr: number; nn: number; elo: number; em: number; market: number };
 }
 
@@ -128,7 +133,7 @@ export function ensembleWinProb(
   const { lr, nn, elo, em, market } = model.ensembleW;
 
   const lrP = lrPredict(model.lrWeights, a, b);
-  const nnP = nnPredictDeep(model.nnWeights, computeFeatures(a, b));
+  const nnP = nnPredictDeep(model.nnWeights, computeFeatures(a, b, model.sentiment));
 
   const eloA = model.elos.get(a.id) ?? 1500;
   const eloB = model.elos.get(b.id) ?? 1500;
@@ -157,7 +162,11 @@ export interface GameSample { features: number[]; label: number; }
 
 export function generateTrainingSamples(teams: Team[]): GameSample[] {
   const samples: GameSample[] = [];
-  const priorW = [2.0, 1.1, 1.1, 0.08, 0.6, 1.0, 0.7, 0.8, 0.5, 0.6, 0.25, 0.12, 0.35, 0.3, 0.18, 0.65, 1.0, 0.85];
+  const priorW = [
+    2.0, 1.1, 1.1, 0.08, 0.6, 1.0, 0.7, 0.8, 0.5, 0.6,
+    0.25, 0.12, 0.35, 0.3, 0.18, 0.65, 1.0, 0.85,
+    0.5, // sentiment diff
+  ];
 
   function synOpp(q: 1 | 2 | 3 | 4): Team {
     const baseOE = [122, 116, 110, 104][q - 1] + (rand() - 0.5) * 6;
@@ -192,10 +201,12 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
       for (let g = 0; g < dist[q]; g++) {
         const opp = synOpp(band);
         const features = computeFeatures(team, opp);
-        const z = features.reduce((s, f, i) => s + priorW[i] * f, 0);
+        const sentimentDiff = (rand() - 0.5) * 0.4;
+        const featuresWithSentiment = [...features, sentimentDiff];
+        const z = featuresWithSentiment.reduce((s, f, i) => s + priorW[i] * f, 0);
         const prob = sigmoid(z);
         const noisy = Math.max(0.04, Math.min(0.96, prob + (rand() - 0.5) * 0.22));
-        samples.push({ features, label: rand() < noisy ? 1 : 0 });
+        samples.push({ features: featuresWithSentiment, label: rand() < noisy ? 1 : 0 });
       }
     }
 
@@ -205,10 +216,12 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
     for (let i = 0; i < numH2H; i++) {
       const opp = peers[Math.floor(rand() * peers.length)];
       const features = computeFeatures(team, opp);
-      const z = features.reduce((s, f, i) => s + priorW[i] * f, 0);
+      const sentimentDiff = (rand() - 0.5) * 0.4;
+      const featuresWithSentiment = [...features, sentimentDiff];
+      const z = featuresWithSentiment.reduce((s, f, i) => s + priorW[i] * f, 0);
       const prob = sigmoid(z);
       const noisy = Math.max(0.05, Math.min(0.95, prob + (rand() - 0.5) * 0.18));
-      samples.push({ features, label: rand() < noisy ? 1 : 0 });
+      samples.push({ features: featuresWithSentiment, label: rand() < noisy ? 1 : 0 });
     }
   });
 
