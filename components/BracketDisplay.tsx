@@ -151,6 +151,7 @@ function GameCard({
         team={teamA}
         isWinner={game.winner?.id === teamA.id}
         prob={game.winProbA}
+        marketProb={game.marketProbA}
         onHover={onHover}
         setPos={setPos}
         onClick={onClick}
@@ -160,6 +161,7 @@ function GameCard({
         team={teamB}
         isWinner={game.winner?.id === teamB.id}
         prob={1 - game.winProbA}
+        marketProb={game.marketProbB}
         onHover={onHover}
         setPos={setPos}
         onClick={onClick}
@@ -169,17 +171,19 @@ function GameCard({
 }
 
 function TeamRow({
-  team, isWinner, prob, onHover, setPos, onClick,
+  team, isWinner, prob, marketProb, onHover, setPos, onClick,
 }: {
   team: Team;
   isWinner: boolean;
   prob: number;
+  marketProb?: number;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
   onClick?: (t: Team) => void;
 }) {
   const barColor = winProbColor(prob);
   const pctDisplay = `${Math.round(prob * 100)}%`;
+  const marketDisplay = marketProb != null ? `${Math.round(marketProb * 100)}%` : null;
 
   return (
     <div
@@ -229,12 +233,16 @@ function TeamRow({
       </span>
 
       {/* Pct */}
-      <span
-        className="flex-shrink-0 pr-1 tabular-nums font-bold"
-        style={{ fontSize: 9, color: barColor }}
-      >
-        {pctDisplay}
-      </span>
+      <div className="flex flex-col items-end pr-1">
+        <span className="tabular-nums font-bold" style={{ fontSize: 9, color: barColor }}>
+          {pctDisplay}
+        </span>
+        {marketDisplay && (
+          <span className="text-[7px] text-slate-500 tabular-nums">
+            mkt {marketDisplay}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

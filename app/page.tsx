@@ -32,6 +32,7 @@ export default function Home() {
   const [modelStats, setModelStats]   = useState<ModelStats | null>(null);
   const [fetchedTeams, setFetchedTeams] = useState(0);
   const abortRef = useRef({ aborted: false });
+  const bracketRef = useRef<HTMLDivElement | null>(null);
 
   const run = useCallback(async () => {
     if (running) return;
@@ -171,7 +172,7 @@ export default function Home() {
         lrWeights,
         nnWeights,
         elos,
-        ensembleW: { lr: 0.35, nn: 0.35, elo: 0.20, em: 0.10 },
+        ensembleW: { lr: 0.35, nn: 0.35, elo: 0.20, em: 0.10, market: 0.10 },
       };
 
       setProgress({
@@ -239,6 +240,12 @@ export default function Home() {
       setRunning(false);
     }
   }, [running, nnEpochs]);
+
+  const downloadPdf = useCallback(async () => {
+    if (!bracketRef.current) return;
+    const { downloadElementPdf } = await import('@/lib/pdf');
+    await downloadElementPdf(bracketRef.current, 'march-mathness-bracket');
+  }, []);
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -409,8 +416,28 @@ export default function Home() {
 
       {/* ── Bracket ── */}
       {bracket && !running && (
-        <section className="flex-1 px-2 py-4">
+        <section ref={bracketRef} className="flex-1 px-2 py-4">
           <LegendBar />
+          <div className="flex items-center gap-3 mb-3">
+            <button
+              onClick={downloadPdf}
+              style={{
+                padding: '8px 18px',
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                background: '#0f172a',
+                color: '#f59e0b',
+                border: '1px solid #1e3a5f',
+                cursor: 'pointer',
+              }}
+            >
+              Download PDF
+            </button>
+            <span className="text-sm text-slate-500">(saves current bracket view)</span>
+          </div>
           <BracketDisplay
             bracket={bracket}
             champion={champion}

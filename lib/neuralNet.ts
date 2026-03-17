@@ -210,19 +210,46 @@ export async function trainDeepNN(
   onProgress: (epoch: number, totalEpochs: number, loss: number, acc: number, lr: number) => void,
   userEpochs: number = 1000,
 ): Promise<DeepNNWeights> {
-  const net   = initDeepNN();
+  const net = initDeepNN();
   const EPOCHS = userEpochs;
   const LR_MAX = 0.005;
   const LR_MIN = 0.0001;
   const WARMUP = Math.min(40, Math.floor(EPOCHS * 0.1));
-  const BATCH  = 64;
-  const n = samples.length;
+  const BATCH = 64;
+
+  const allSamples = [...samples];
+  const valSize = Math.max(40, Math.floor(allSamples.length * 0.1));
+  const valSamples = allSamples.slice(0, valSize);
+  const trainSamples = allSamples.slice(valSize);
+  const n = trainSamples.length;
+
+  // Clone net weights for early stopping
+  const cloneNet = (src: DeepNNWeights): DeepNNWeights => {
+    return {
+      t: src.t,
+      layers: src.layers.map(l => ({
+        inSize: l.inSize,
+        outSize: l.outSize,
+        w: new Float32Array(l.w),
+        b: new Float32Array(l.b),
+        mW: new Float32Array(l.mW),
+        vW: new Float32Array(l.vW),
+        mB: new Float32Array(l.mB),
+        vB: new Float32Array(l.vB),
+      })),
+    };
+  };
+
+  let bestNet: DeepNNWeights | null = null;
+  let bestValLoss = Infinity;
+  let stagnant = 0;
+  const patience = Math.max(25, Math.floor(EPOCHS * 0.12));
 
   for (let epoch = 0; epoch < EPOCHS; epoch++) {
-    // Shuffle
+    // Shuffle training data
     for (let i = n - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
-      [samples[i], samples[j]] = [samples[j], samples[i]];
+      [trainSamples[i], trainSamples[j]] = [trainSamples[j], trainSamples[i]];
     }
 
     // LR schedule: linear warmup then cosine annealing with 3 restarts
@@ -236,12 +263,12 @@ export async function trainDeepNN(
     }
 
     let totalLoss = 0;
-    let correct   = 0;
+    let correct = 0;
 
     for (let b = 0; b < n; b += BATCH) {
       const bEnd = Math.min(b + BATCH, n);
       for (let si = b; si < bEnd; si++) {
-        const { features, label } = samples[si];
+        const { features, label } = trainSamples[si];
         const cache = nnForwardDeep(net, new Float32Array(features));
         const p = cache.output;
         const smoothed = label * 0.95 + 0.025;
@@ -251,14 +278,37 @@ export async function trainDeepNN(
       }
     }
 
+    // Validation
+    let valLoss = 0;
+    let valCorrect = 0;
+    for (const { features, label } of valSamples) {
+      const p = nnForwardDeep(net, new Float32Array(features)).output;
+      const smoothed = label * 0.95 + 0.025;
+      valLoss += -(smoothed * Math.log(p + 1e-10) + (1 - smoothed) * Math.log(1 - p + 1e-10));
+      if ((p > 0.5) === (label === 1)) valCorrect++;
+    }
+    valLoss /= valSamples.length;
+
+    if (valLoss < bestValLoss - 1e-5) {
+      bestValLoss = valLoss;
+      bestNet = cloneNet(net);
+      stagnant = 0;
+    } else {
+      stagnant++;
+    }
+
     const reportStep = Math.max(1, Math.floor(EPOCHS / 40));
     if (epoch % reportStep === 0 || epoch === EPOCHS - 1) {
       onProgress(epoch + 1, EPOCHS, totalLoss / n, correct / n, lr);
       await new Promise(r => setTimeout(r, 0));
     }
+
+    if (stagnant > patience) {
+      break;
+    }
   }
 
-  return net;
+  return bestNet ?? net;
 }
 
 // ── Serialise to plain NNWeights for storage / old API ────────────────────

@@ -96,6 +96,8 @@ export interface BracketGame {
   teamB: Team | null;
   winner: Team | null;
   winProbA: number;
+  marketProbA?: number; // market-implied probability for teamA
+  marketProbB?: number; // market-implied probability for teamB
   round: number;
   region: string;
   position: number;
@@ -156,7 +158,7 @@ export interface ModelStats {
   featureImportance: FeatureImportance[];
   trainingSamples: number;
   epochs: number;
-  ensembleWeights: { lr: number; nn: number; elo: number; em: number };
+  ensembleWeights: { lr: number; nn: number; elo: number; em: number; market: number };
 }
 
 export type ModelWeights = number[];

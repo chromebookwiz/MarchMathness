@@ -104,7 +104,14 @@ export interface EnsembleModel {
   lrWeights: ModelWeights;
   nnWeights: DeepNNWeights;
   elos: Map<string, number>;
-  ensembleW: { lr: number; nn: number; elo: number; em: number };
+  ensembleW: { lr: number; nn: number; elo: number; em: number; market: number };
+}
+
+function marketWinProb(a: Team, b: Team): number {
+  // Proxy for betting market implied probabilities based on seed gap
+  // (stronger seeds are favored in real books).
+  const seedDiff = b.seed - a.seed;
+  return 1 / (1 + Math.exp(-seedDiff / 4));
 }
 
 export function ensembleWinProb(
@@ -112,7 +119,7 @@ export function ensembleWinProb(
   a: Team,
   b: Team,
 ): number {
-  const { lr, nn, elo, em } = model.ensembleW;
+  const { lr, nn, elo, em, market } = model.ensembleW;
 
   const lrP = lrPredict(model.lrWeights, a, b);
   const nnP = nnPredictDeep(model.nnWeights, computeFeatures(a, b));
@@ -125,8 +132,11 @@ export function ensembleWinProb(
   const bEM = b.adjOE - b.adjDE;
   const emP = sigmoid((aEM - bEM) * 0.20);
 
-  // Base ensemble
-  let p = lr * lrP + nn * nnP + elo * eloP + em * emP;
+  const marketP = marketWinProb(a, b);
+
+  // Base ensemble (weighted average)
+  const totalW = lr + nn + elo + em + market;
+  let p = (lr * lrP + nn * nnP + elo * eloP + em * emP + market * marketP) / Math.max(totalW, 1);
 
   // Player-level adjustment (if roster data available)
   const playerAdj = playerWinProbAdjustment(a, b);
@@ -293,7 +303,7 @@ export function computeModelStats(
     featureImportance: fi,
     trainingSamples: samples.length,
     epochs: 2000,
-    ensembleWeights: { lr: 0.35, nn: 0.35, elo: 0.20, em: 0.10 },
+    ensembleWeights: { lr: 0.35, nn: 0.35, elo: 0.20, em: 0.10, market: 0.10 },
   };
 }
 
@@ -368,6 +378,8 @@ export interface DisplayGame {
   teamB: Team | null;
   winner: Team | null;
   winProbA: number;
+  marketProbA?: number;
+  marketProbB?: number;
   round: number;
   region: string;
   position: number;
@@ -413,8 +425,10 @@ function buildRegionGames(
       const key = `r${regionIdx}_rd${rd}_g${i / 2}`;
       const winner = simResult.allRoundWinners.get(key) ?? null;
       const prob = ensembleWinProb(model, a, b);
+      const marketP = marketWinProb(a, b);
       games.push({
         id: key, teamA: a, teamB: b, winner, winProbA: prob,
+        marketProbA: marketP, marketProbB: 1 - marketP,
         round: rd + 1, region: regionName, position: i / 2,
       });
     }
@@ -448,16 +462,25 @@ export function buildDisplayBracket(
     finalFour: [
       {
         id: 'ff_0', teamA: ff0a, teamB: ff0b, winner: simResult.ffWinners[0],
-        winProbA: ensembleWinProb(model, ff0a, ff0b), round: 5, region: 'Final Four', position: 0,
+        winProbA: ensembleWinProb(model, ff0a, ff0b),
+        marketProbA: marketWinProb(ff0a, ff0b),
+        marketProbB: 1 - marketWinProb(ff0a, ff0b),
+        round: 5, region: 'Final Four', position: 0,
       },
       {
         id: 'ff_1', teamA: ff1a, teamB: ff1b, winner: simResult.ffWinners[1],
-        winProbA: ensembleWinProb(model, ff1a, ff1b), round: 5, region: 'Final Four', position: 1,
+        winProbA: ensembleWinProb(model, ff1a, ff1b),
+        marketProbA: marketWinProb(ff1a, ff1b),
+        marketProbB: 1 - marketWinProb(ff1a, ff1b),
+        round: 5, region: 'Final Four', position: 1,
       },
     ],
     championship: {
       id: 'champ', teamA: champA, teamB: champB, winner: simResult.champion,
-      winProbA: ensembleWinProb(model, champA, champB), round: 6, region: 'Championship', position: 0,
+      winProbA: ensembleWinProb(model, champA, champB),
+      marketProbA: marketWinProb(champA, champB),
+      marketProbB: 1 - marketWinProb(champA, champB),
+      round: 6, region: 'Championship', position: 0,
     },
   };
 }
