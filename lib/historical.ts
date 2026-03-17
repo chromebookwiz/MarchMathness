@@ -28,10 +28,9 @@ const API_BASE = 'https://www.balldontlie.io/api/v1';
 async function fetchAllGamesForSeason(season: number): Promise<GameRecord[]> {
   const games: GameRecord[] = [];
   let page = 1;
-  const perPage = 100;
 
   while (true) {
-    const res = await fetch(`${API_BASE}/games?seasons[]=${season}&per_page=${perPage}&page=${page}`);
+    const res = await fetch(`/api/balldontlie/games?season=${season}&page=${page}`);
     if (!res.ok) break;
     const body = await res.json();
     const data = body.data as GameRecord[];
