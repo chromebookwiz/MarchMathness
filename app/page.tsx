@@ -3,7 +3,9 @@
 import { useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { SimProgress, ModelStats, Team } from '@/lib/types';
-import type { DisplayBracket, EnsembleModel } from '@/lib/simulation';
+import type { DisplayBracket, EnsembleModel, GameSample, TrainingData } from '@/lib/simulation';
+import { lrPredict } from '@/lib/simulation';
+import { nnPredictDeep } from '@/lib/neuralNet';
 import ProgressBar from '@/components/ProgressBar';
 
 const BracketDisplay = dynamic(() => import('@/components/BracketDisplay'), { ssr: false });
@@ -106,19 +108,19 @@ export default function Home() {
       const historicalOutcomes = await fetchHistoricalOutcomes([2020, 2021, 2022, 2023, 2024, 2025]);
       const historicalSamples = buildHistoricalSamples(allTeams, historicalOutcomes, sentiment);
 
-      const samples   = await generateTrainingSamples(allTeams, sentiment, historicalSamples);
-      const samplesNN = [...samples];
+      const { train: trainSamples, val: valSamples } = await generateTrainingSamples(historicalSamples);
+      const samplesNN = [...trainSamples];
 
       setProgress({
         phase: 'generating', phaseProgress: 0.5, overall: 0.17,
         message: 'BUILDING TRAINING CORPUS',
-        detail: `${samples.length.toLocaleString()} labelled matchup samples generated`,
+        detail: `${trainSamples.length.toLocaleString()} labelled matchup samples generated`,
       });
       await showPhase(150);
 
       setProgress({
         phase: 'generating', phaseProgress: 1, overall: 0.20,
-        message: `SEASON DATA READY — ${samples.length.toLocaleString()} SAMPLES`,
+        message: `SEASON DATA READY — ${trainSamples.length.toLocaleString()} SAMPLES`,
         detail: 'Feature vectors: 19-dimensional (incl. sentiment) • Label smoothing: ε=0.05',
       });
       await showPhase(200);
@@ -132,7 +134,7 @@ export default function Home() {
       await showPhase(100);
 
       let lrFinalLoss = 1, lrFinalAcc = 0;
-      const lrWeights = await trainLogisticRegression(samples, tp => {
+      const lrWeights = await trainLogisticRegression(trainSamples, tp => {
         lrFinalLoss = tp.loss; lrFinalAcc = tp.accuracy;
         setProgress({
           phase: 'training-lr',
@@ -153,7 +155,7 @@ export default function Home() {
       await showPhase(100);
 
       let nnFinalAcc = 0;
-      const nnWeights = await trainDeepNN(samplesNN, (epoch, totalEpochs, loss, acc, lr) => {
+      const nnWeights = await trainDeepNN(trainSamples, (epoch, totalEpochs, loss, acc, lr) => {
         nnFinalAcc = acc;
         setProgress({
           phase: 'training-nn',
@@ -184,8 +186,23 @@ export default function Home() {
 
       const marketOdds = await fetchMarketOdds(allTeams);
 
-      // Use the previously generated samples for model stats.
-      const stats = computeModelStats(lrWeights, samples, lrFinalLoss, lrFinalAcc, nnFinalAcc);
+      const valMetrics = { valLoss: 0, valAcc: 0 };
+      if (valSamples.length > 0) {
+        let valLoss = 0;
+        let valCorrect = 0;
+        for (const { features, label } of valSamples) {
+          const p = 1 / (1 + Math.exp(-features.reduce((s, f, i) => s + lrWeights[i] * f, 0)));
+          valLoss += -(label * Math.log(p + 1e-10) + (1 - label) * Math.log(1 - p + 1e-10));
+          if ((p > 0.5) === (label === 1)) valCorrect++;
+        }
+        valMetrics.valLoss = valLoss / valSamples.length;
+        valMetrics.valAcc = valCorrect / valSamples.length;
+      }
+
+      const stats = computeModelStats(
+        lrWeights, trainSamples, lrFinalLoss, lrFinalAcc, nnFinalAcc,
+        valMetrics.valLoss, valMetrics.valAcc,
+      );
       setModelStats(stats);
 
       const model: EnsembleModel = {

@@ -154,6 +154,8 @@ export interface ModelStats {
   weights: number[];
   finalLoss: number;
   finalAccuracy: number;
+  valLoss?: number;
+  valAccuracy?: number;
   nnAccuracy?: number;
   featureImportance: FeatureImportance[];
   trainingSamples: number;

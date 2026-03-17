@@ -160,14 +160,26 @@ export function ensembleWinProb(
 
 export interface GameSample { features: number[]; label: number; }
 
+export interface TrainingData {
+  train: GameSample[];
+  val: GameSample[];
+}
+
 export async function generateTrainingSamples(
-  teams: Team[],
-  sentiment?: Map<string, number>,
-  historicalSamples?: GameSample[],
-): Promise<GameSample[]> {
-  // Use only real historical game outcomes for training.
-  // Do not generate synthetic/mocked labels.
-  return historicalSamples ?? [];
+  historicalSamples: GameSample[],
+  trainFrac = 0.8,
+): Promise<TrainingData> {
+  const shuffled = [...historicalSamples];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  const split = Math.floor(shuffled.length * trainFrac);
+  return {
+    train: shuffled.slice(0, split),
+    val: shuffled.slice(split),
+  };
 }
 
 // ─── Logistic regression (Adam) ────────────────────────────────────────────
@@ -245,6 +257,8 @@ export function computeModelStats(
   finalLoss: number,
   finalAccuracy: number,
   nnAcc: number,
+  valLoss?: number,
+  valAccuracy?: number,
 ): ModelStats {
   const fi: FeatureImportance[] = weights
     .map((w, i) => ({ name: FEATURE_NAMES[i], weight: w, absWeight: Math.abs(w), rank: 0 }))
@@ -255,6 +269,8 @@ export function computeModelStats(
     weights,
     finalLoss,
     finalAccuracy,
+    valLoss,
+    valAccuracy,
     nnAccuracy: nnAcc,
     featureImportance: fi,
     trainingSamples: samples.length,
