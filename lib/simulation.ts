@@ -1,5 +1,6 @@
-import type { Team, ModelWeights, NNWeights, EloRating, ModelStats, FeatureImportance, TrainingProgress } from './types';
-import { nnPredict, nnForward, nnBackprop, initNN, initAdamNN, trainNeuralNet } from './neuralNet';
+import type { Team, ModelWeights, ModelStats, FeatureImportance, TrainingProgress } from './types';
+import type { DeepNNWeights } from './neuralNet';
+import { nnPredictDeep } from './neuralNet';
 import { playerWinProbAdjustment } from './playerSim';
 
 // ─── Feature names ─────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ export function eloWinProb(eloa: number, elob: number): number {
 
 export interface EnsembleModel {
   lrWeights: ModelWeights;
-  nnWeights: NNWeights;
+  nnWeights: DeepNNWeights;
   elos: Map<string, number>;
   ensembleW: { lr: number; nn: number; elo: number; em: number };
 }
@@ -106,7 +107,7 @@ export function ensembleWinProb(
   const { lr, nn, elo, em } = model.ensembleW;
 
   const lrP = lrPredict(model.lrWeights, a, b);
-  const nnP = nnPredict(model.nnWeights, computeFeatures(a, b));
+  const nnP = nnPredictDeep(model.nnWeights, computeFeatures(a, b));
 
   const eloA = model.elos.get(a.id) ?? 1500;
   const eloB = model.elos.get(b.id) ?? 1500;

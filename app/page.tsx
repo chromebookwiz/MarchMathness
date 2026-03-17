@@ -7,24 +7,32 @@ import type { DisplayBracket, ConsensusData, EnsembleModel } from '@/lib/simulat
 import ProgressBar from '@/components/ProgressBar';
 
 const BracketDisplay = dynamic(() => import('@/components/BracketDisplay'), { ssr: false });
+const InfoModal      = dynamic(() => import('@/components/InfoModal'),      { ssr: false });
+const TeamStatsPanel = dynamic(() => import('@/components/TeamStatsPanel'), { ssr: false });
 
 const DEFAULT_N = 5000;
-
 type Mode = 'single' | 'consensus';
 
+// Minimum ms to show a phase in the progress bar (visual feedback)
+async function showPhase(ms: number) {
+  await new Promise(r => setTimeout(r, ms));
+}
+
 export default function Home() {
-  const [mode, setMode]         = useState<Mode>('single');
-  const [simN, setSimN]         = useState(DEFAULT_N);
-  const [running, setRunning]   = useState(false);
-  const [progress, setProgress] = useState<SimProgress>({
+  const [mode, setMode]               = useState<Mode>('single');
+  const [simN, setSimN]               = useState(DEFAULT_N);
+  const [running, setRunning]         = useState(false);
+  const [showInfo, setShowInfo]       = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [progress, setProgress]       = useState<SimProgress>({
     phase: 'idle', phaseProgress: 0, overall: 0,
     message: 'SELECT A MODE AND CLICK GENERATE',
     detail: '',
   });
-  const [bracket, setBracket]   = useState<DisplayBracket | null>(null);
-  const [consensus, setConsensus] = useState<ConsensusData | null>(null);
-  const [champion, setChampion] = useState<Team | null>(null);
-  const [modelStats, setModelStats] = useState<ModelStats | null>(null);
+  const [bracket, setBracket]         = useState<DisplayBracket | null>(null);
+  const [consensus, setConsensus]     = useState<ConsensusData | null>(null);
+  const [champion, setChampion]       = useState<Team | null>(null);
+  const [modelStats, setModelStats]   = useState<ModelStats | null>(null);
   const [fetchedTeams, setFetchedTeams] = useState(0);
   const abortRef = useRef({ aborted: false });
 
@@ -32,7 +40,7 @@ export default function Home() {
     if (running) return;
     setRunning(true);
     abortRef.current = { aborted: false };
-    setBracket(null); setConsensus(null); setChampion(null);
+    setBracket(null); setConsensus(null); setChampion(null); setSelectedTeam(null);
 
     try {
       const { buildRegionTeams } = await import('@/lib/bracket');
@@ -41,77 +49,80 @@ export default function Home() {
         simulateBracket, runConsensusAnalysis, buildDisplayBracket,
         buildEloRatings,
       } = await import('@/lib/simulation');
-      const { trainNeuralNet, initNN } = await import('@/lib/neuralNet');
-      const { fetchAllRosters, computeRosterMetrics } = await import('@/lib/espn');
+      const { trainDeepNN } = await import('@/lib/neuralNet');
+      const { fetchAllRosters } = await import('@/lib/espn');
 
       const regionTeams = buildRegionTeams();
-      const allTeams = regionTeams.flat();
+      const allTeams    = regionTeams.flat();
 
-      // ── Phase 1: Fetch ESPN player data ──────────────────────────────
+      // ── Phase 1: Fetch ESPN player data ───────────────────────────────
       setProgress({
-        phase: 'fetching', phaseProgress: 0, overall: 0.02,
+        phase: 'fetching', phaseProgress: 0, overall: 0.01,
         message: 'FETCHING LIVE PLAYER DATA FROM ESPN API',
         detail: `Requesting rosters for all ${allTeams.length} tournament teams…`,
       });
-      await tick();
+      await showPhase(200);
 
-      let fetchedCount = 0;
       const rosterMap = await fetchAllRosters(
         allTeams.map(t => t.id),
         (done, total) => {
-          fetchedCount = done;
           setFetchedTeams(done);
           setProgress({
             phase: 'fetching',
             phaseProgress: done / total,
-            overall: 0.02 + (done / total) * 0.12,
+            overall: 0.01 + (done / total) * 0.13,
             message: `FETCHING ROSTERS — ${done}/${total} TEAMS`,
-            detail: `${allTeams[done - 1]?.name ?? ''} — ${(allTeams[done - 1]?.roster?.length ?? 0)} players`,
+            detail: `${allTeams[done - 1]?.name ?? ''} loaded`,
           });
         },
       );
 
-      // Attach rosters to teams
       for (const team of allTeams) {
-        const players = rosterMap.get(team.id) ?? [];
-        (team as Team).roster = players;
+        team.roster = rosterMap.get(team.id) ?? [];
       }
 
-      const fetchedWithRosters = allTeams.filter(t => (t.roster?.length ?? 0) > 0).length;
+      const withRosters = allTeams.filter(t => (t.roster?.length ?? 0) > 0).length;
+      const totalPlayers = allTeams.reduce((s, t) => s + (t.roster?.length ?? 0), 0);
 
       setProgress({
         phase: 'fetching', phaseProgress: 1, overall: 0.14,
-        message: `PLAYER DATA LOADED — ${fetchedWithRosters}/${allTeams.length} TEAMS`,
-        detail: `Total players: ${allTeams.reduce((s, t) => s + (t.roster?.length ?? 0), 0)} | Using player-adjusted features`,
+        message: `PLAYER DATA LOADED — ${withRosters}/${allTeams.length} TEAMS`,
+        detail: `${totalPlayers} players • BPM / TS% / usage extracted • Player adjustments active`,
       });
-      await tick();
+      await showPhase(300);
 
-      // ── Phase 2: Generate training samples ───────────────────────────
+      // ── Phase 2: Generate training samples ────────────────────────────
       setProgress({
-        phase: 'generating', phaseProgress: 0, overall: 0.16,
+        phase: 'generating', phaseProgress: 0, overall: 0.15,
         message: 'GENERATING SYNTHETIC SEASON GAME LOGS',
-        detail: '~2,400 labelled matchup samples • Q1-Q4 opponent distribution',
+        detail: 'Q1-Q4 opponent distribution • H2H peer matchups • player-adjusted labels',
       });
-      await tick();
+      await showPhase(150);
 
-      const samples = generateTrainingSamples(allTeams);
-      // Duplicate for nn training
+      const samples   = generateTrainingSamples(allTeams);
       const samplesNN = [...samples];
+
+      setProgress({
+        phase: 'generating', phaseProgress: 0.5, overall: 0.17,
+        message: 'BUILDING TRAINING CORPUS',
+        detail: `${samples.length.toLocaleString()} labelled matchup samples generated`,
+      });
+      await showPhase(150);
 
       setProgress({
         phase: 'generating', phaseProgress: 1, overall: 0.20,
         message: `SEASON DATA READY — ${samples.length.toLocaleString()} SAMPLES`,
-        detail: 'H2H matchups + quadrant distribution + player-adjusted labels',
+        detail: 'Feature vectors: 18-dimensional • Label smoothing: ε=0.05',
       });
-      await tick();
+      await showPhase(200);
 
-      // ── Phase 3: Train LR model ───────────────────────────────────────
+      // ── Phase 3: Train Logistic Regression ────────────────────────────
       setProgress({
-        phase: 'training-lr', phaseProgress: 0, overall: 0.22,
+        phase: 'training-lr', phaseProgress: 0, overall: 0.21,
         message: 'TRAINING LOGISTIC REGRESSION — ADAM OPTIMIZER',
-        detail: 'β₁=0.9  β₂=0.999  λ=0.0008  cosine LR  2000 epochs  batch=64',
+        detail: 'β₁=0.9  β₂=0.999  λ=0.0008  cosine LR decay  2000 epochs  batch=64',
       });
-      await tick();
+      await showPhase(100);
 
       let lrFinalLoss = 1, lrFinalAcc = 0;
       const lrWeights = await trainLogisticRegression(samples, tp => {
@@ -119,31 +130,31 @@ export default function Home() {
         setProgress({
           phase: 'training-lr',
           phaseProgress: tp.epoch / tp.totalEpochs,
-          overall: 0.22 + (tp.epoch / tp.totalEpochs) * 0.22,
+          overall: 0.21 + (tp.epoch / tp.totalEpochs) * 0.20,
           message: `LR GRADIENT DESCENT — EPOCH ${tp.epoch.toLocaleString()}/${tp.totalEpochs.toLocaleString()}`,
           detail: `Loss: ${tp.loss.toFixed(5)}  Acc: ${(tp.accuracy * 100).toFixed(1)}%  LR: ${tp.lrDecay.toFixed(4)}`,
           training: tp,
         });
       });
 
-      // ── Phase 4: Train Neural Net ─────────────────────────────────────
+      // ── Phase 4: Train Deep Neural Network ───────────────────────────
       setProgress({
-        phase: 'training-nn', phaseProgress: 0, overall: 0.45,
-        message: 'TRAINING NEURAL NETWORK [18→32→16→1]',
-        detail: 'ReLU activations • cosine warm restarts • backpropagation • 1200 epochs',
+        phase: 'training-nn', phaseProgress: 0, overall: 0.42,
+        message: 'TRAINING DEEP NEURAL NETWORK [18→64→32→16→8→1]',
+        detail: 'LeakyReLU α=0.01 · label smoothing ε=0.05 · gradient clipping · cosine warm restarts · 2500 epochs',
       });
-      await tick();
+      await showPhase(100);
 
       let nnFinalAcc = 0;
-      const nnWeights = await trainNeuralNet(samplesNN, (epoch, loss, acc) => {
+      const nnWeights = await trainDeepNN(samplesNN, (epoch, totalEpochs, loss, acc, lr) => {
         nnFinalAcc = acc;
         setProgress({
           phase: 'training-nn',
-          phaseProgress: epoch / 1200,
-          overall: 0.45 + (epoch / 1200) * 0.15,
-          message: `NEURAL NET BACKPROP — EPOCH ${epoch}/1200`,
-          detail: `Loss: ${loss.toFixed(5)}  Acc: ${(acc * 100).toFixed(1)}%`,
-          training: { epoch, totalEpochs: 1200, loss, accuracy: acc, lrDecay: 0.003, modelType: 'neural' },
+          phaseProgress: epoch / totalEpochs,
+          overall: 0.42 + (epoch / totalEpochs) * 0.18,
+          message: `DEEP NN BACKPROP — EPOCH ${epoch.toLocaleString()}/${totalEpochs.toLocaleString()}`,
+          detail: `Loss: ${loss.toFixed(5)}  Acc: ${(acc * 100).toFixed(1)}%  LR: ${lr.toFixed(5)}`,
+          training: { epoch, totalEpochs, loss, accuracy: acc, lrDecay: lr, modelType: 'neural' },
         });
       });
 
@@ -151,11 +162,11 @@ export default function Home() {
       setProgress({
         phase: 'calibrating-elo', phaseProgress: 0, overall: 0.61,
         message: 'CALIBRATING ELO RATINGS FROM SEASON PERFORMANCE',
-        detail: 'NET rank + efficiency margin + SOS → initial Elo scores',
+        detail: 'NET rank × 6pt/step + efficiency margin × 12 + SOS bonus → Elo base 1500',
       });
-      await tick();
+      await showPhase(250);
 
-      const elos = buildEloRatings(allTeams);
+      const elos  = buildEloRatings(allTeams);
       const stats = computeModelStats(lrWeights, samples, lrFinalLoss, lrFinalAcc, nnFinalAcc);
       setModelStats(stats);
 
@@ -167,38 +178,68 @@ export default function Home() {
       };
 
       setProgress({
-        phase: 'calibrating-elo', phaseProgress: 1, overall: 0.63,
-        message: 'ELO CALIBRATED — ENSEMBLE MODEL READY',
-        detail: `LR: 35%  NN: 35%  Elo: 20%  EM: 10%  +Player adj`,
+        phase: 'calibrating-elo', phaseProgress: 0.5, overall: 0.62,
+        message: 'BUILDING ENSEMBLE MODEL',
+        detail: 'LR 35% · Deep NN 35% · Elo 20% · Efficiency Margin 10% · ±8pp Player Adj',
       });
-      await tick();
+      await showPhase(300);
+
+      setProgress({
+        phase: 'calibrating-elo', phaseProgress: 1, overall: 0.64,
+        message: 'ENSEMBLE MODEL READY',
+        detail: `LR acc: ${(lrFinalAcc * 100).toFixed(1)}%  NN acc: ${(nnFinalAcc * 100).toFixed(1)}%  Elo: calibrated`,
+      });
+      await showPhase(200);
 
       // ── Phase 6: Simulate ─────────────────────────────────────────────
       if (mode === 'single') {
         setProgress({
-          phase: 'simulating', phaseProgress: 0, overall: 0.65,
+          phase: 'simulating', phaseProgress: 0, overall: 0.66,
           message: 'SIMULATING TOURNAMENT BRACKET',
-          detail: 'Sampling 63 games from learned ensemble probability distribution',
+          detail: 'Sampling 63 games from ensemble probability distribution',
         });
-        await tick();
+        await showPhase(300);
 
         const simResult = simulateBracket(regionTeams, model, abortRef.current);
-        const display   = buildDisplayBracket(regionTeams, model, simResult, null);
 
+        setProgress({
+          phase: 'simulating', phaseProgress: 0.6, overall: 0.80,
+          message: 'RUNNING PLAYER-LEVEL POSSESSION SIMULATION',
+          detail: 'BPM · TS% · depth score · usage-weighted shot selection',
+        });
+        await showPhase(300);
+
+        setProgress({
+          phase: 'simulating', phaseProgress: 1, overall: 0.90,
+          message: 'BRACKET SIMULATION COMPLETE',
+          detail: `63 games resolved · Champion: ${simResult.champion.name}`,
+        });
+        await showPhase(150);
+
+        setProgress({
+          phase: 'analyzing', phaseProgress: 0, overall: 0.92,
+          message: 'BUILDING DISPLAY BRACKET',
+          detail: 'Mapping game results to visualization layout',
+        });
+        await showPhase(200);
+
+        const display = buildDisplayBracket(regionTeams, model, simResult, null);
         setBracket(display);
         setChampion(simResult.champion);
+
         setProgress({
           phase: 'done', phaseProgress: 1, overall: 1,
           message: 'BRACKET GENERATED',
           detail: `Predicted champion: ${simResult.champion.name} (#${simResult.champion.seed} seed, ${simResult.champion.region})`,
         });
+
       } else {
         setProgress({
-          phase: 'simulating', phaseProgress: 0, overall: 0.65,
+          phase: 'simulating', phaseProgress: 0, overall: 0.66,
           message: `RUNNING ${simN.toLocaleString()} MONTE CARLO SIMULATIONS`,
           detail: 'Each simulation independently samples all 63 games from ensemble probabilities',
         });
-        await tick();
+        await showPhase(150);
 
         const consensusData = await runConsensusAnalysis(
           regionTeams, model, simN,
@@ -207,20 +248,27 @@ export default function Home() {
             setProgress({
               phase: 'simulating',
               phaseProgress: frac,
-              overall: 0.65 + frac * 0.28,
-              message: `SIMULATING — ${done.toLocaleString()} / ${total.toLocaleString()}`,
-              detail: `${(frac * 100).toFixed(1)}% complete`,
+              overall: 0.66 + frac * 0.26,
+              message: `MONTE CARLO — ${done.toLocaleString()} / ${total.toLocaleString()} SIMULATIONS`,
+              detail: `${(frac * 100).toFixed(1)}% complete · ${(done * 63).toLocaleString()} total games simulated`,
             });
           },
           abortRef.current,
         );
 
         setProgress({
-          phase: 'analyzing', phaseProgress: 0, overall: 0.95,
-          message: 'AGGREGATING CHAMPION/F4/E8 FREQUENCIES',
+          phase: 'analyzing', phaseProgress: 0, overall: 0.93,
+          message: 'AGGREGATING CHAMPION / F4 / E8 / S16 FREQUENCIES',
           detail: `Computing consensus bracket from ${consensusData.totalSims.toLocaleString()} simulations`,
         });
-        await tick();
+        await showPhase(200);
+
+        setProgress({
+          phase: 'analyzing', phaseProgress: 0.5, overall: 0.96,
+          message: 'COMPUTING STATISTICAL CONFIDENCE INTERVALS',
+          detail: 'Wilson CIs · Brier score · ECE · expected wins per team',
+        });
+        await showPhase(250);
 
         const simResult = consensusData.mostLikelyBracket;
         const display   = buildDisplayBracket(regionTeams, model, simResult, consensusData);
@@ -239,6 +287,7 @@ export default function Home() {
           detail: `Champion: ${bestChamp.name} — ${((bestCnt / consensusData.totalSims) * 100).toFixed(1)}% of simulations`,
         });
       }
+
     } catch (err) {
       console.error(err);
       setProgress({
@@ -253,24 +302,46 @@ export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col" style={{ background: '#020817', fontFamily: 'monospace' }}>
+
       {/* ── Header ── */}
       <header style={{ borderBottom: '1px solid #0d1e30', background: '#030b18' }}>
         <div className="max-w-screen-2xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <div style={{ width: 4, height: 32, background: '#f59e0b' }} />
-              <div>
-                <h1 className="text-2xl font-black tracking-[0.1em] uppercase" style={{ color: '#f0f4f8', letterSpacing: '0.08em' }}>
-                  MARCH <span style={{ color: '#f59e0b' }}>MATH</span>NESS
-                </h1>
-                <p className="text-[10px] tracking-[0.25em] uppercase" style={{ color: '#1e3a5f' }}>
-                  Logistic Regression · Neural Network [18→32→16→1] · Elo · Monte Carlo · Player Sim
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div style={{ width: 4, height: 32, background: '#f59e0b', flexShrink: 0 }} />
+            <div>
+              <h1 className="text-2xl font-black tracking-[0.08em] uppercase" style={{ color: '#f0f4f8' }}>
+                MARCH <span style={{ color: '#f59e0b' }}>MATH</span>NESS
+              </h1>
+              <p className="text-[10px] tracking-[0.25em] uppercase" style={{ color: '#1e3a5f' }}>
+                Deep NN [18→64→32→16→8→1] · Logistic Regression · Elo · Monte Carlo · Player Sim
+              </p>
             </div>
           </div>
 
-          {modelStats && <ModelBadge stats={modelStats} />}
+          <div className="flex items-center gap-4">
+            {modelStats && <ModelBadge stats={modelStats} />}
+            <button
+              onClick={() => setShowInfo(true)}
+              style={{
+                border: '1px solid #1e3a5f',
+                background: 'transparent',
+                color: '#475569',
+                width: 28,
+                height: 28,
+                fontFamily: 'monospace',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+              title="About this simulation"
+            >
+              ?
+            </button>
+          </div>
         </div>
       </header>
 
@@ -292,7 +363,7 @@ export default function Home() {
             />
           </div>
 
-          {/* N slider (consensus only) */}
+          {/* N slider */}
           {mode === 'consensus' && (
             <div
               className="flex items-center gap-3 px-3 py-2"
@@ -303,8 +374,7 @@ export default function Home() {
                 type="range" min={500} max={25000} step={500}
                 value={simN} onChange={e => setSimN(+e.target.value)}
                 disabled={running}
-                className="w-28 accent-amber-500"
-                style={{ accentColor: '#f59e0b' }}
+                style={{ width: 112, accentColor: '#f59e0b' }}
               />
               <span className="text-sm font-black tabular-nums" style={{ color: '#f59e0b', minWidth: 48 }}>
                 {simN.toLocaleString()}
@@ -315,25 +385,29 @@ export default function Home() {
           {/* Generate button */}
           <button
             onClick={run} disabled={running}
-            className="px-8 py-2.5 font-black text-xs tracking-[0.2em] uppercase transition-all duration-150"
             style={{
+              padding: '10px 32px',
+              fontFamily: 'monospace',
+              fontWeight: 900,
+              fontSize: 12,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
               background: running ? '#0d1e30' : '#f59e0b',
               color: running ? '#1e3a5f' : '#000',
               cursor: running ? 'not-allowed' : 'pointer',
               border: running ? '1px solid #1e3a5f' : '1px solid #f59e0b',
               boxShadow: running ? 'none' : '0 0 16px #f59e0b44',
-              letterSpacing: '0.15em',
+              transition: 'all 0.15s',
             }}
           >
             {running ? (
-              <span className="flex items-center gap-2">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>◈</span>
                 ANALYZING…
               </span>
             ) : mode === 'single' ? 'GENERATE' : `RUN ${simN.toLocaleString()}`}
           </button>
 
-          {/* Data fetch counter */}
           {running && fetchedTeams > 0 && (
             <span className="text-[10px] tracking-widest" style={{ color: '#1e3a5f' }}>
               ESPN: {fetchedTeams}/64 teams loaded
@@ -373,6 +447,22 @@ export default function Home() {
                 {champion.roster.slice(0, 3).map(p => p.name.split(' ').pop()).join(' · ')}
               </span>
             )}
+            <button
+              onClick={() => setSelectedTeam(champion)}
+              style={{
+                marginLeft: 'auto',
+                border: '1px solid #f59e0b44',
+                background: 'transparent',
+                color: '#f59e0b',
+                fontSize: 9,
+                letterSpacing: '0.15em',
+                padding: '3px 10px',
+                cursor: 'pointer',
+                fontFamily: 'monospace',
+              }}
+            >
+              VIEW STATS
+            </button>
           </div>
         </div>
       )}
@@ -387,7 +477,7 @@ export default function Home() {
             >
               ▸ MODEL DETAILS — FEATURE IMPORTANCE · ENSEMBLE WEIGHTS · TRAINING METRICS
             </summary>
-            <ModelStatsPanel stats={modelStats} consensus={consensus} allTeams={[]} />
+            <ModelStatsPanel stats={modelStats} consensus={consensus} />
           </details>
         </div>
       )}
@@ -396,13 +486,18 @@ export default function Home() {
       {bracket && !running && (
         <section className="flex-1 px-2 py-4">
           <LegendBar mode={mode} />
-          <BracketDisplay bracket={bracket} consensus={consensus} champion={champion} />
+          <BracketDisplay
+            bracket={bracket}
+            consensus={consensus}
+            champion={champion}
+            onTeamClick={setSelectedTeam}
+          />
         </section>
       )}
 
       {/* ── Empty state ── */}
       {!bracket && !running && progress.phase === 'idle' && (
-        <EmptyState />
+        <EmptyState onInfo={() => setShowInfo(true)} />
       )}
 
       {/* ── Footer ── */}
@@ -412,15 +507,23 @@ export default function Home() {
             March MathNess · 2025 NCAA Tournament · Player Data via ESPN
           </span>
           <span className="text-[9px] tracking-[0.2em] text-slate-800 uppercase">
-            Ensemble: LR + NN + Elo + EM · Player-adjusted probabilities
+            Deep NN [18→64→32→16→8→1] · LR · Elo · Player BPM/TS%
           </span>
         </div>
       </div>
+
+      {/* ── Modals & Panels ── */}
+      <InfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} />
+      <TeamStatsPanel
+        team={selectedTeam}
+        onClose={() => setSelectedTeam(null)}
+        consensus={consensus}
+      />
     </main>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────
 
 function ModeBtn({
   active, disabled, onClick, label, sub,
@@ -430,16 +533,18 @@ function ModeBtn({
   return (
     <button
       onClick={onClick} disabled={disabled}
-      className="px-5 py-2.5 transition-colors duration-100"
       style={{
+        padding: '10px 20px',
         background: active ? '#091626' : 'transparent',
         cursor: disabled ? 'not-allowed' : 'pointer',
+        border: 'none',
+        fontFamily: 'monospace',
       }}
     >
-      <div className="text-xs font-bold tracking-[0.1em] uppercase" style={{ color: active ? '#f59e0b' : '#334155' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: active ? '#f59e0b' : '#334155' }}>
         {label}
       </div>
-      <div className="text-[9px] tracking-widest" style={{ color: active ? '#78716c' : '#1e2d40' }}>
+      <div style={{ fontSize: 9, letterSpacing: '0.15em', color: active ? '#78716c' : '#1e2d40' }}>
         {sub}
       </div>
     </button>
@@ -450,10 +555,10 @@ function ModelBadge({ stats }: { stats: ModelStats }) {
   return (
     <div className="flex gap-4">
       {[
-        { l: 'LR ACC', v: `${(stats.finalAccuracy * 100).toFixed(1)}%`, c: '#22c55e' },
-        { l: 'NN ACC', v: `${((stats.nnAccuracy ?? 0) * 100).toFixed(1)}%`, c: '#3b82f6' },
-        { l: 'LR LOSS', v: stats.finalLoss.toFixed(4), c: '#f59e0b' },
-        { l: 'SAMPLES', v: stats.trainingSamples.toLocaleString(), c: '#64748b' },
+        { l: 'LR ACC',   v: `${(stats.finalAccuracy * 100).toFixed(1)}%`,          c: '#22c55e' },
+        { l: 'NN ACC',   v: `${((stats.nnAccuracy ?? 0) * 100).toFixed(1)}%`,      c: '#3b82f6' },
+        { l: 'LR LOSS',  v: stats.finalLoss.toFixed(4),                             c: '#f59e0b' },
+        { l: 'SAMPLES',  v: stats.trainingSamples.toLocaleString(),                 c: '#64748b' },
       ].map(m => (
         <div key={m.l} className="text-right">
           <div className="text-[9px] tracking-[0.2em] text-slate-700 uppercase">{m.l}</div>
@@ -464,7 +569,7 @@ function ModelBadge({ stats }: { stats: ModelStats }) {
   );
 }
 
-function ModelStatsPanel({ stats, consensus }: { stats: ModelStats; consensus: ConsensusData | null; allTeams: Team[] }) {
+function ModelStatsPanel({ stats, consensus }: { stats: ModelStats; consensus: ConsensusData | null }) {
   return (
     <div className="pb-4" style={{ borderTop: '1px solid #0a1628' }}>
       <div className="grid grid-cols-2 gap-4 pt-3">
@@ -492,13 +597,13 @@ function ModelStatsPanel({ stats, consensus }: { stats: ModelStats; consensus: C
           </div>
         </div>
 
-        {/* Consensus stats */}
+        {/* Consensus / Ensemble */}
         <div>
           <div className="text-[9px] tracking-[0.25em] text-slate-700 uppercase mb-2">
             {consensus ? 'Consensus Final Four Probabilities' : 'Ensemble Architecture'}
           </div>
           {consensus ? (
-            <TopTeamsList freq={consensus.ffFreq} total={consensus.totalSims} label="F4" />
+            <TopTeamsList freq={consensus.ffFreq} total={consensus.totalSims} />
           ) : (
             <EnsembleChart w={stats.ensembleWeights} />
           )}
@@ -508,10 +613,8 @@ function ModelStatsPanel({ stats, consensus }: { stats: ModelStats; consensus: C
   );
 }
 
-function TopTeamsList({ freq, total, label }: { freq: Map<string, number>; total: number; label: string }) {
-  const sorted = Array.from(freq.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+function TopTeamsList({ freq, total }: { freq: Map<string, number>; total: number }) {
+  const sorted = Array.from(freq.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
   return (
     <div className="space-y-0.5">
       {sorted.map(([id, cnt]) => {
@@ -531,9 +634,9 @@ function TopTeamsList({ freq, total, label }: { freq: Map<string, number>; total
 function EnsembleChart({ w }: { w: { lr: number; nn: number; elo: number; em: number } }) {
   const items = [
     { label: 'Logistic Regression', pct: w.lr * 100, color: '#f59e0b' },
-    { label: 'Neural Network', pct: w.nn * 100, color: '#3b82f6' },
-    { label: 'Elo System', pct: w.elo * 100, color: '#8b5cf6' },
-    { label: 'Efficiency Margin', pct: w.em * 100, color: '#22c55e' },
+    { label: 'Deep Neural Network', pct: w.nn * 100, color: '#3b82f6' },
+    { label: 'Elo System',          pct: w.elo * 100, color: '#8b5cf6' },
+    { label: 'Efficiency Margin',   pct: w.em * 100, color: '#22c55e' },
   ];
   return (
     <div className="space-y-2">
@@ -549,7 +652,7 @@ function EnsembleChart({ w }: { w: { lr: number; nn: number; elo: number; em: nu
         </div>
       ))}
       <div className="text-[9px] text-slate-700 pt-1">
-        +Player adjustment (±8pp) from roster BPM/TS% analysis
+        +Player adjustment (±8pp) via BPM / TS% / depth score
       </div>
     </div>
   );
@@ -558,36 +661,29 @@ function EnsembleChart({ w }: { w: { lr: number; nn: number; elo: number; em: nu
 function LegendBar({ mode }: { mode: Mode }) {
   return (
     <div className="px-4 mb-2 flex items-center gap-4" style={{ fontFamily: 'monospace' }}>
-      <div className="flex items-center gap-1.5">
-        <div style={{ width: 3, height: 12, background: '#22c55e' }} />
-        <span className="text-[9px] text-slate-600 uppercase tracking-widest">Winner</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <div style={{ width: 8, height: 8, background: '#f59e0b' }} />
-        <span className="text-[9px] text-slate-600 uppercase tracking-widest">1-seed</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <div style={{ width: 8, height: 8, background: '#60a5fa' }} />
-        <span className="text-[9px] text-slate-600 uppercase tracking-widest">2–4 seeds</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <div style={{ width: 8, height: 8, background: '#a3e635' }} />
-        <span className="text-[9px] text-slate-600 uppercase tracking-widest">5–8 seeds</span>
-      </div>
+      {[
+        { color: '#22c55e', label: 'Winner' },
+        { color: '#f59e0b', label: '1-seed' },
+        { color: '#60a5fa', label: '2–4 seeds' },
+        { color: '#a3e635', label: '5–8 seeds' },
+      ].map(({ color, label }) => (
+        <div key={label} className="flex items-center gap-1.5">
+          <div style={{ width: 8, height: 8, background: color }} />
+          <span className="text-[9px] text-slate-600 uppercase tracking-widest">{label}</span>
+        </div>
+      ))}
       <span className="text-[9px] text-slate-700 uppercase tracking-widest">
-        {mode === 'consensus'
-          ? '% = consensus simulation frequency'
-          : '% = ensemble win probability'}
+        {mode === 'consensus' ? '% = consensus simulation frequency' : '% = ensemble win probability'}
       </span>
-      <span className="text-[9px] text-slate-700 ml-auto">Hover team for player stats</span>
+      <span className="text-[9px] text-slate-700 ml-auto">Click team for full stats · Hover for quick view</span>
     </div>
   );
 }
 
-function EmptyState() {
+function EmptyState({ onInfo }: { onInfo: () => void }) {
   return (
     <div className="flex-1 flex items-center justify-center">
-      <div style={{ border: '1px solid #0d1e30', background: '#030b18', padding: 48, maxWidth: 480 }}>
+      <div style={{ border: '1px solid #0d1e30', background: '#030b18', padding: 48, maxWidth: 520 }}>
         <div className="text-[9px] tracking-[0.3em] text-slate-700 uppercase mb-4">System Ready</div>
         <h2 className="text-xl font-black text-slate-300 uppercase tracking-widest mb-4">
           SELECT MODE TO BEGIN
@@ -608,11 +704,11 @@ function EmptyState() {
         >
           {[
             'ESPN live roster data for all 64 tournament teams',
-            'Logistic regression: Adam optimizer, 2000 epochs, cosine LR',
-            'Neural network: 18→32→16→1, backprop, warm restarts',
-            'Elo calibration from NET ranking + efficiency margin',
-            'Player-level BPM/TS%/usage adjustments per matchup',
-            'Possession simulator for player game-line analysis',
+            'Logistic Regression: Adam · 2000 epochs · cosine LR · λ=0.0008',
+            'Deep Neural Network: [18→64→32→16→8→1] · LeakyReLU · 2500 epochs',
+            'Elo calibration from NET ranking + efficiency margin + SOS',
+            'Player-level BPM / TS% / usage adjustments per matchup',
+            'Possession-by-possession player simulation with OT support',
           ].map(s => (
             <div key={s} className="flex gap-2">
               <span style={{ color: '#1e3a5f' }}>–</span>
@@ -620,9 +716,23 @@ function EmptyState() {
             </div>
           ))}
         </div>
+        <button
+          onClick={onInfo}
+          style={{
+            marginTop: 24,
+            border: '1px solid #1e3a5f',
+            background: 'transparent',
+            color: '#475569',
+            fontSize: 9,
+            letterSpacing: '0.2em',
+            padding: '6px 16px',
+            cursor: 'pointer',
+            fontFamily: 'monospace',
+          }}
+        >
+          LEARN HOW IT WORKS →
+        </button>
       </div>
     </div>
   );
 }
-
-function tick() { return new Promise(r => setTimeout(r, 0)); }

@@ -10,9 +10,10 @@ interface Props {
   bracket: DisplayBracket;
   consensus: ConsensusData | null;
   champion: Team | null;
+  onTeamClick?: (team: Team) => void;
 }
 
-export default function BracketDisplay({ bracket, consensus, champion }: Props) {
+export default function BracketDisplay({ bracket, consensus, champion, onTeamClick }: Props) {
   const [hoveredTeam, setHoveredTeam] = useState<Team | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -34,9 +35,9 @@ export default function BracketDisplay({ bracket, consensus, champion }: Props) 
         {/* LEFT: East (top) + South (bottom) */}
         <div className="flex flex-col" style={{ gap: 20 }}>
           <RegionLabel name="EAST" />
-          <RegionHalf rounds={bracket.east} direction="ltr" onHover={setHoveredTeam} setPos={setTooltipPos} />
+          <RegionHalf rounds={bracket.east} direction="ltr" onHover={setHoveredTeam} setPos={setTooltipPos} onClick={onTeamClick} />
           <RegionLabel name="SOUTH" />
-          <RegionHalf rounds={bracket.south} direction="ltr" onHover={setHoveredTeam} setPos={setTooltipPos} />
+          <RegionHalf rounds={bracket.south} direction="ltr" onHover={setHoveredTeam} setPos={setTooltipPos} onClick={onTeamClick} />
         </div>
 
         {/* CENTER */}
@@ -46,14 +47,15 @@ export default function BracketDisplay({ bracket, consensus, champion }: Props) 
           champion={champion}
           onHover={setHoveredTeam}
           setPos={setTooltipPos}
+          onClick={onTeamClick}
         />
 
         {/* RIGHT: Midwest (top) + West (bottom) */}
         <div className="flex flex-col" style={{ gap: 20 }}>
           <RegionLabel name="MIDWEST" right />
-          <RegionHalf rounds={bracket.midwest} direction="rtl" onHover={setHoveredTeam} setPos={setTooltipPos} />
+          <RegionHalf rounds={bracket.midwest} direction="rtl" onHover={setHoveredTeam} setPos={setTooltipPos} onClick={onTeamClick} />
           <RegionLabel name="WEST" right />
-          <RegionHalf rounds={bracket.west} direction="rtl" onHover={setHoveredTeam} setPos={setTooltipPos} />
+          <RegionHalf rounds={bracket.west} direction="rtl" onHover={setHoveredTeam} setPos={setTooltipPos} onClick={onTeamClick} />
         </div>
       </div>
 
@@ -77,12 +79,13 @@ function RegionLabel({ name, right = false }: { name: string; right?: boolean })
 }
 
 function RegionHalf({
-  rounds, direction, onHover, setPos,
+  rounds, direction, onHover, setPos, onClick,
 }: {
   rounds: DisplayGame[][];
   direction: 'ltr' | 'rtl';
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   const ordered = direction === 'rtl' ? [...rounds].reverse() : rounds;
   return (
@@ -96,6 +99,7 @@ function RegionHalf({
             roundIdx={roundIdx}
             onHover={onHover}
             setPos={setPos}
+            onClick={onClick}
           />
         );
       })}
@@ -104,12 +108,13 @@ function RegionHalf({
 }
 
 function RoundCol({
-  games, roundIdx, onHover, setPos,
+  games, roundIdx, onHover, setPos, onClick,
 }: {
   games: DisplayGame[];
   roundIdx: number;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   return (
     <div className="relative flex-shrink-0" style={{ width: ROUND_W, height: REGION_H }}>
@@ -119,7 +124,7 @@ function RoundCol({
           className="absolute"
           style={{ top: gameTopPx(roundIdx, gi), width: ROUND_W }}
         >
-          <GameCard game={game} onHover={onHover} setPos={setPos} />
+          <GameCard game={game} onHover={onHover} setPos={setPos} onClick={onClick} />
         </div>
       ))}
     </div>
@@ -127,11 +132,12 @@ function RoundCol({
 }
 
 function GameCard({
-  game, onHover, setPos,
+  game, onHover, setPos, onClick,
 }: {
   game: DisplayGame;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   const { teamA, teamB } = game;
   if (!teamA || !teamB) return null;
@@ -151,6 +157,7 @@ function GameCard({
         consensus={game.teamAConsensus}
         onHover={onHover}
         setPos={setPos}
+        onClick={onClick}
       />
       <div style={{ height: 1, background: '#0d1e30' }} />
       <TeamRow
@@ -160,13 +167,14 @@ function GameCard({
         consensus={game.teamBConsensus}
         onHover={onHover}
         setPos={setPos}
+        onClick={onClick}
       />
     </div>
   );
 }
 
 function TeamRow({
-  team, isWinner, prob, consensus, onHover, setPos,
+  team, isWinner, prob, consensus, onHover, setPos, onClick,
 }: {
   team: Team;
   isWinner: boolean;
@@ -174,6 +182,7 @@ function TeamRow({
   consensus?: number;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   const barColor = winProbColor(prob);
   const pctDisplay = consensus !== undefined
@@ -182,11 +191,12 @@ function TeamRow({
 
   return (
     <div
-      className="relative flex items-center overflow-hidden cursor-default"
+      className="relative flex items-center overflow-hidden"
       style={{
         height: SLOT_H,
         background: isWinner ? '#091626' : '#050a14',
         borderLeft: isWinner ? `2px solid ${barColor}` : '2px solid transparent',
+        cursor: onClick ? 'pointer' : 'default',
       }}
       onMouseEnter={e => {
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -194,6 +204,7 @@ function TeamRow({
         onHover(team);
       }}
       onMouseLeave={() => onHover(null)}
+      onClick={() => onClick?.(team)}
     >
       {/* Probability bar bg */}
       <div
@@ -237,13 +248,14 @@ function TeamRow({
 }
 
 function CenterColumn({
-  bracket, consensus, champion, onHover, setPos,
+  bracket, consensus, champion, onHover, setPos, onClick,
 }: {
   bracket: DisplayBracket;
   consensus: ConsensusData | null;
   champion: Team | null;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   const halfH = REGION_H;
   const totalH = halfH * 2 + 20;
@@ -259,24 +271,25 @@ function CenterColumn({
     >
       <div className="text-[9px] tracking-[0.3em] text-slate-700 mb-2 uppercase">Final Four</div>
 
-      <FFGameBlock game={bracket.finalFour[0]} label="EAST · SOUTH" onHover={onHover} setPos={setPos} />
+      <FFGameBlock game={bracket.finalFour[0]} label="EAST · SOUTH" onHover={onHover} setPos={setPos} onClick={onClick} />
 
       <div className="my-3 w-full">
-        <ChampBlock game={bracket.championship} champion={champion} consensus={consensus} onHover={onHover} setPos={setPos} />
+        <ChampBlock game={bracket.championship} champion={champion} consensus={consensus} onHover={onHover} setPos={setPos} onClick={onClick} />
       </div>
 
-      <FFGameBlock game={bracket.finalFour[1]} label="MIDWEST · WEST" onHover={onHover} setPos={setPos} />
+      <FFGameBlock game={bracket.finalFour[1]} label="MIDWEST · WEST" onHover={onHover} setPos={setPos} onClick={onClick} />
     </div>
   );
 }
 
 function FFGameBlock({
-  game, label, onHover, setPos,
+  game, label, onHover, setPos, onClick,
 }: {
   game: DisplayGame;
   label: string;
   onHover: (t: Team | null) => void;
   setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   const { teamA, teamB, winner } = game;
   if (!teamA || !teamB) return null;
@@ -287,13 +300,13 @@ function FFGameBlock({
         <FFRow
           team={teamA} isWinner={winner?.id === teamA.id}
           prob={game.winProbA} consensus={game.teamAConsensus}
-          onHover={onHover} setPos={setPos}
+          onHover={onHover} setPos={setPos} onClick={onClick}
         />
         <div style={{ height: 1, background: '#1e3a5f' }} />
         <FFRow
           team={teamB} isWinner={winner?.id === teamB.id}
           prob={1 - game.winProbA} consensus={game.teamBConsensus}
-          onHover={onHover} setPos={setPos}
+          onHover={onHover} setPos={setPos} onClick={onClick}
         />
       </div>
     </div>
@@ -301,18 +314,20 @@ function FFGameBlock({
 }
 
 function FFRow({
-  team, isWinner, prob, consensus, onHover, setPos,
+  team, isWinner, prob, consensus, onHover, setPos, onClick,
 }: {
   team: Team; isWinner: boolean; prob: number; consensus?: number;
   onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   return (
     <div
-      className="flex items-center gap-2 px-3 cursor-default"
+      className="flex items-center gap-2 px-3"
       style={{
         height: 30,
         background: isWinner ? '#0c1f38' : '#050e1c',
         borderLeft: isWinner ? `3px solid ${winProbColor(prob)}` : '3px solid transparent',
+        cursor: onClick ? 'pointer' : 'default',
       }}
       onMouseEnter={e => {
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -320,6 +335,7 @@ function FFRow({
         onHover(team);
       }}
       onMouseLeave={() => onHover(null)}
+      onClick={() => onClick?.(team)}
     >
       <span className="font-bold tabular-nums" style={{ fontSize: 10, color: seedColor(team.seed), width: 16 }}>
         {team.seed}
@@ -335,10 +351,11 @@ function FFRow({
 }
 
 function ChampBlock({
-  game, champion, consensus, onHover, setPos,
+  game, champion, consensus, onHover, setPos, onClick,
 }: {
   game: DisplayGame; champion: Team | null; consensus: ConsensusData | null;
   onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   const { teamA, teamB, winner } = game;
   if (!teamA || !teamB) return null;
@@ -367,6 +384,7 @@ function ChampBlock({
             consensus={t === teamA ? game.teamAConsensus : game.teamBConsensus}
             onHover={onHover}
             setPos={setPos}
+            onClick={onClick}
           />
           {t === teamA && <div style={{ height: 1, background: '#f59e0b22' }} />}
         </div>
@@ -390,18 +408,20 @@ function ChampBlock({
 }
 
 function ChampRow({
-  team, isWinner, prob, consensus, onHover, setPos,
+  team, isWinner, prob, consensus, onHover, setPos, onClick,
 }: {
   team: Team; isWinner: boolean; prob: number; consensus?: number;
   onHover: (t: Team | null) => void; setPos: (p: { x: number; y: number }) => void;
+  onClick?: (t: Team) => void;
 }) {
   return (
     <div
-      className="flex items-center gap-2 px-3 cursor-default"
+      className="flex items-center gap-2 px-3"
       style={{
         height: 36,
         background: isWinner ? '#160c00' : '#08060a',
         borderLeft: isWinner ? '3px solid #f59e0b' : '3px solid transparent',
+        cursor: onClick ? 'pointer' : 'default',
       }}
       onMouseEnter={e => {
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -409,6 +429,7 @@ function ChampRow({
         onHover(team);
       }}
       onMouseLeave={() => onHover(null)}
+      onClick={() => onClick?.(team)}
     >
       <span className="font-bold tabular-nums" style={{ fontSize: 11, color: seedColor(team.seed), width: 18 }}>
         {team.seed}
