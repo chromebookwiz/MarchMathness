@@ -194,7 +194,7 @@ function OverviewTab() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
             ['18 features', 'per matchup'],
-            ['2,500 NN epochs', 'per run'],
+            ['1,000 NN epochs', 'per run'],
             ['25,000 max sims', 'Monte Carlo'],
             ['64 teams', 'live ESPN data'],
             ['63 games', 'per simulation'],
@@ -236,7 +236,7 @@ function DataTab() {
 
       <Section title="Pre-loaded team metrics">
         <P>
-          KenPom-style adjusted efficiency metrics are pre-loaded for all 64 teams (2025 NCAA field).
+          KenPom-style adjusted efficiency metrics are pre-loaded for all 64 teams (2026 NCAA field).
           These metrics are the foundation of the feature vectors used in all ML models.
         </P>
         {[
@@ -284,9 +284,9 @@ function ModelsTab() {
           <StatRow label="Weight storage" value="Float32Array (2× faster)" />
           <StatRow label="Label smoothing" value="ε=0.05 (prevents overconfidence)" />
           <StatRow label="Gradient clipping" value="L2 norm ≤ 1.0 (training stability)" />
-          <StatRow label="LR schedule" value="Linear warmup (100 epochs) + cosine × 3 restarts" />
-          <StatRow label="Epochs" value="2,500" />
-          <StatRow label="Batch size" value="48" />
+          <StatRow label="LR schedule" value="Linear warmup (40 epochs) + cosine × 3 restarts" />
+          <StatRow label="Epochs" value="1,000" />
+          <StatRow label="Batch size" value="64" />
           <StatRow label="Optimizer" value="Adam per-layer (β₁=0.9, β₂=0.999)" />
         </div>
         <P>

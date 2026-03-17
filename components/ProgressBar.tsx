@@ -31,11 +31,11 @@ export default function ProgressBar({ progress }: { progress: SimProgress }) {
               animation: isDone ? 'none' : 'pulse 1s ease-in-out infinite',
             }}
           />
-          <span className="text-xs font-bold tracking-[0.2em] text-slate-300">
-            {PHASE_LABELS[phase] ?? phase.toUpperCase()}
+          <span className="font-bold">
+            {PHASE_LABELS[phase] ?? phase}
           </span>
         </div>
-        <span className="text-xl font-black text-amber-400 tabular-nums">{pct}%</span>
+        <span className="font-black tabular-nums">{pct}%</span>
       </div>
 
       {/* Progress bar */}
@@ -61,15 +61,15 @@ export default function ProgressBar({ progress }: { progress: SimProgress }) {
         </div>
         <div className="flex justify-between mt-0.5">
           {[0, 25, 50, 75, 100].map(tick => (
-            <span key={tick} className="text-[9px] text-slate-700 tabular-nums">{tick}</span>
+            <span key={tick} className="tabular-nums">{tick}</span>
           ))}
         </div>
       </div>
 
       {/* Message */}
       <div className="px-3 pb-2 space-y-0.5">
-        <div className="text-xs text-slate-300">{message}</div>
-        {detail && <div className="text-[11px] text-slate-600">{detail}</div>}
+        <div>{message}</div>
+        {detail && <div>{detail}</div>}
       </div>
 
       {/* Training metrics */}

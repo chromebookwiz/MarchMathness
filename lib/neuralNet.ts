@@ -5,8 +5,8 @@
  * - Label smoothing (ε=0.05) — prevents overconfident predictions
  * - Gradient clipping (max L2 norm = 1.0) — stable training
  * - Per-layer Adam optimizer state
- * - Cosine annealing LR with linear warm-up (first 100 epochs)
- * - 2500 epochs total
+ * - Cosine annealing LR with linear warm-up (first 40 epochs)
+ * - 1000 epochs total (converges well before 2500; ~2.5× faster)
  */
 
 import type { NNWeights } from './types';
@@ -209,11 +209,11 @@ export async function trainDeepNN(
   onProgress: (epoch: number, totalEpochs: number, loss: number, acc: number, lr: number) => void,
 ): Promise<DeepNNWeights> {
   const net   = initDeepNN();
-  const EPOCHS = 2500;
-  const LR_MAX = 0.004;
+  const EPOCHS = 1000;
+  const LR_MAX = 0.005;
   const LR_MIN = 0.0001;
-  const WARMUP = 100;    // linear warmup epochs
-  const BATCH  = 48;
+  const WARMUP = 40;     // linear warmup epochs
+  const BATCH  = 64;
   const n = samples.length;
 
   for (let epoch = 0; epoch < EPOCHS; epoch++) {
@@ -249,7 +249,7 @@ export async function trainDeepNN(
       }
     }
 
-    if (epoch % 50 === 0 || epoch === EPOCHS - 1) {
+    if (epoch % 25 === 0 || epoch === EPOCHS - 1) {
       onProgress(epoch + 1, EPOCHS, totalLoss / n, correct / n, lr);
       await new Promise(r => setTimeout(r, 0));
     }

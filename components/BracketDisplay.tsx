@@ -469,12 +469,12 @@ function PlayerTooltip({ team, x, y }: { team: Team; x: number; y: number }) {
         style={{ background: '#050e1c', borderBottom: '1px solid #1e3a5f' }}
       >
         <div>
-          <span className="text-[9px] tracking-widest text-slate-600 uppercase">{team.region} • #{team.seed}</span>
-          <div className="text-xs font-bold text-slate-200">{team.name}</div>
+          <span>{team.region} · #{team.seed}</span>
+          <div className="font-bold">{team.name}</div>
         </div>
         <div className="text-right">
-          <div className="text-[9px] text-slate-600">NET</div>
-          <div className="text-sm font-black text-amber-400">{team.netRanking}</div>
+          <div>NET</div>
+          <div className="font-black">{team.netRanking}</div>
         </div>
       </div>
 
@@ -487,8 +487,8 @@ function PlayerTooltip({ team, x, y }: { team: Team; x: number; y: number }) {
           { l: 'W-L', v: `${team.wins}-${team.losses}` },
         ].map(s => (
           <div key={s.l} className="text-center py-1 border-r border-[#1e3a5f] last:border-r-0">
-            <div className="text-[7px] text-slate-700 uppercase">{s.l}</div>
-            <div className="text-[10px] font-bold text-slate-400">{s.v}</div>
+            <div>{s.l}</div>
+            <div className="font-bold">{s.v}</div>
           </div>
         ))}
       </div>
@@ -500,7 +500,7 @@ function PlayerTooltip({ team, x, y }: { team: Team; x: number; y: number }) {
           {starters.map(p => <PlayerRow key={p.id} player={p} starter />)}
           {bench.length > 0 && (
             <>
-              <div className="text-[8px] text-slate-700 px-2 py-0.5 bg-[#040a14] uppercase tracking-widest">Bench</div>
+              <div className="px-2 py-0.5">Bench</div>
               {bench.map(p => <PlayerRow key={p.id} player={p} starter={false} />)}
             </>
           )}
@@ -517,12 +517,12 @@ function PlayerTooltip({ team, x, y }: { team: Team; x: number; y: number }) {
 function PlayerHeader() {
   return (
     <div className="grid px-2 py-0.5 bg-[#030810]" style={{ gridTemplateColumns: '1fr 28px 28px 28px 28px 30px' }}>
-      <span className="text-[7px] text-slate-700 uppercase">PLAYER</span>
-      <span className="text-[7px] text-slate-700 text-right">PTS</span>
-      <span className="text-[7px] text-slate-700 text-right">REB</span>
-      <span className="text-[7px] text-slate-700 text-right">AST</span>
-      <span className="text-[7px] text-slate-700 text-right">USG</span>
-      <span className="text-[7px] text-slate-700 text-right">TS%</span>
+      <span>PLAYER</span>
+      <span className="text-right">PTS</span>
+      <span className="text-right">REB</span>
+      <span className="text-right">AST</span>
+      <span className="text-right">USG</span>
+      <span className="text-right">TS%</span>
     </div>
   );
 }

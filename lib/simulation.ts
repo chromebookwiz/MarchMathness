@@ -78,9 +78,9 @@ export function buildEloRatings(teams: Team[]): Map<string, number> {
   for (const t of teams) {
     // Base Elo from NET ranking + efficiency margin
     const em = t.adjOE - t.adjDE;
-    const netBonus = Math.max(0, (70 - t.netRanking)) * 6;
-    const emBonus  = em * 12;
-    const sosBonus = Math.max(0, (80 - t.sos)) * 2;
+    const netBonus = Math.max(0, (80 - t.netRanking)) * 6;
+    const emBonus  = em * 13;
+    const sosBonus = Math.max(0, (90 - t.sos)) * 1.5;
     elos.set(t.id, 1500 + netBonus + emBonus + sosBonus);
   }
   return elos;
@@ -115,7 +115,7 @@ export function ensembleWinProb(
 
   const aEM = a.adjOE - a.adjDE;
   const bEM = b.adjOE - b.adjDE;
-  const emP = sigmoid((aEM - bEM) * 0.22);
+  const emP = sigmoid((aEM - bEM) * 0.20);
 
   // Base ensemble
   let p = lr * lrP + nn * nnP + elo * eloP + em * emP;
@@ -133,7 +133,7 @@ export interface GameSample { features: number[]; label: number; }
 
 export function generateTrainingSamples(teams: Team[]): GameSample[] {
   const samples: GameSample[] = [];
-  const priorW = [1.6, 0.9, 1.0, 0.1, 0.5, 0.8, 0.6, 0.7, 0.4, 0.5, 0.2, 0.1, 0.3, 0.25, 0.15, 0.5, 0.8, 0.7];
+  const priorW = [2.0, 1.1, 1.1, 0.08, 0.6, 1.0, 0.7, 0.8, 0.5, 0.6, 0.25, 0.12, 0.35, 0.3, 0.18, 0.65, 1.0, 0.85];
 
   function synOpp(q: 1 | 2 | 3 | 4): Team {
     const baseOE = [122, 116, 110, 104][q - 1] + (Math.random() - 0.5) * 6;
@@ -176,8 +176,8 @@ export function generateTrainingSamples(teams: Team[]): GameSample[] {
     }
 
     // Direct H2H matchups vs nearby-ranked teams
-    const peers = teams.filter(t => t.id !== team.id && Math.abs(t.netRanking - team.netRanking) < 18);
-    const numH2H = Math.min(5, peers.length);
+    const peers = teams.filter(t => t.id !== team.id && Math.abs(t.netRanking - team.netRanking) < 22);
+    const numH2H = Math.min(6, peers.length);
     for (let i = 0; i < numH2H; i++) {
       const opp = peers[Math.floor(Math.random() * peers.length)];
       const features = computeFeatures(team, opp);

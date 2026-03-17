@@ -10,7 +10,7 @@ const BracketDisplay = dynamic(() => import('@/components/BracketDisplay'), { ss
 const InfoModal      = dynamic(() => import('@/components/InfoModal'),      { ssr: false });
 const TeamStatsPanel = dynamic(() => import('@/components/TeamStatsPanel'), { ssr: false });
 
-const DEFAULT_N = 5000;
+const DEFAULT_N = 10;
 type Mode = 'single' | 'consensus';
 
 // Minimum ms to show a phase in the progress bar (visual feedback)
@@ -141,7 +141,7 @@ export default function Home() {
       setProgress({
         phase: 'training-nn', phaseProgress: 0, overall: 0.42,
         message: 'TRAINING DEEP NEURAL NETWORK [18→64→32→16→8→1]',
-        detail: 'LeakyReLU α=0.01 · label smoothing ε=0.05 · gradient clipping · cosine warm restarts · 2500 epochs',
+        detail: 'LeakyReLU α=0.01 · label smoothing ε=0.05 · gradient clipping · cosine warm restarts · 1000 epochs',
       });
       await showPhase(100);
 
@@ -301,21 +301,13 @@ export default function Home() {
   }, [running, mode, simN]);
 
   return (
-    <main className="min-h-screen flex flex-col" style={{ background: '#020817', fontFamily: 'monospace' }}>
+    <main className="min-h-screen flex flex-col">
 
       {/* ── Header ── */}
       <header style={{ borderBottom: '1px solid #0d1e30', background: '#030b18' }}>
-        <div className="max-w-screen-2xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div style={{ width: 4, height: 32, background: '#f59e0b', flexShrink: 0 }} />
-            <div>
-              <h1 className="text-2xl font-black tracking-[0.08em] uppercase" style={{ color: '#f0f4f8' }}>
-                MARCH <span style={{ color: '#f59e0b' }}>MATH</span>NESS
-              </h1>
-              <p className="text-[10px] tracking-[0.25em] uppercase" style={{ color: '#1e3a5f' }}>
-                Deep NN [18→64→32→16→8→1] · Logistic Regression · Elo · Monte Carlo · Player Sim
-              </p>
-            </div>
+        <div className="flex items-center justify-between px-6 py-4">
+          <div>
+            <h1 className="text-xl font-bold">March Mathness Bracket Generator</h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -363,22 +355,34 @@ export default function Home() {
             />
           </div>
 
-          {/* N slider */}
+          {/* Sim-count preset chips */}
           {mode === 'consensus' && (
             <div
-              className="flex items-center gap-3 px-3 py-2"
+              className="flex items-center gap-1 px-2 py-1"
               style={{ border: '1px solid #1e3a5f', background: '#030b18' }}
             >
-              <span className="text-[9px] tracking-[0.2em] text-slate-600 uppercase">SIMS</span>
-              <input
-                type="range" min={500} max={25000} step={500}
-                value={simN} onChange={e => setSimN(+e.target.value)}
-                disabled={running}
-                style={{ width: 112, accentColor: '#f59e0b' }}
-              />
-              <span className="text-sm font-black tabular-nums" style={{ color: '#f59e0b', minWidth: 48 }}>
-                {simN.toLocaleString()}
-              </span>
+              <span className="text-[9px] tracking-[0.2em] text-slate-600 uppercase mr-1">SIMS</span>
+              {[10, 100, 500, 1000, 5000].map(n => (
+                <button
+                  key={n}
+                  onClick={() => setSimN(n)}
+                  disabled={running}
+                  style={{
+                    padding: '4px 10px',
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: simN === n ? 900 : 400,
+                    letterSpacing: '0.05em',
+                    background: simN === n ? '#f59e0b22' : 'transparent',
+                    color: simN === n ? '#f59e0b' : '#334155',
+                    border: simN === n ? '1px solid #f59e0b66' : '1px solid transparent',
+                    cursor: running ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.1s',
+                  }}
+                >
+                  {n >= 1000 ? `${n / 1000}k` : n}
+                </button>
+              ))}
             </div>
           )}
 
@@ -502,13 +506,9 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <div style={{ borderTop: '1px solid #0a1628', padding: '6px 24px' }}>
-        <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
-          <span className="text-[9px] tracking-[0.2em] text-slate-800 uppercase">
-            March MathNess · 2025 NCAA Tournament · Player Data via ESPN
-          </span>
-          <span className="text-[9px] tracking-[0.2em] text-slate-800 uppercase">
-            Deep NN [18→64→32→16→8→1] · LR · Elo · Player BPM/TS%
-          </span>
+        <div className="flex items-center justify-between">
+          <span>March Mathness · 2026 NCAA Tournament</span>
+          <span>Player Data via ESPN</span>
         </div>
       </div>
 
@@ -705,7 +705,7 @@ function EmptyState({ onInfo }: { onInfo: () => void }) {
           {[
             'ESPN live roster data for all 64 tournament teams',
             'Logistic Regression: Adam · 2000 epochs · cosine LR · λ=0.0008',
-            'Deep Neural Network: [18→64→32→16→8→1] · LeakyReLU · 2500 epochs',
+            'Deep Neural Network: [18→64→32→16→8→1] · LeakyReLU · 1000 epochs',
             'Elo calibration from NET ranking + efficiency margin + SOS',
             'Player-level BPM / TS% / usage adjustments per matchup',
             'Possession-by-possession player simulation with OT support',
